@@ -5,22 +5,8 @@ Repository for the Main Hawaiian Islands Deep 7 Bottomfish Stock Assessment
 Code for data exploration, preparation, standardization, analysis, and model development and evaluation will be stored in this repo. 
 
 ### Data Exploration
-Preliminary data exploration summaries for the BFISH survey, FRS, DRS, and shark depredation datasets can be found [here](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/index.md)
+Preliminary data exploration summaries for the BFISH survey, FRS, DRS, and shark depredation datasets can be found [here.](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/index.md)
 
-  1. [BFISH Opaka Length Frequency Investigations](https://PIFSCstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/BFISH_Length_Comp.html)
-  
-  2. [Deep 7 Length Frequency Distribution Investigations](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep_6_Length_Comps.html)  
-  
-  3. [Opakapaka FRS Weight Frequency Investigation](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/Data_exploration_Rmarkdowns/FRS_Opaka_Investigation.html)
-  
-
-  4. [Deep 7 FRS Weight Frequency Investigation](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/Data_exploration_Rmarkdowns/Deep7_FRS_Investigation.html)
-  
-
-  5. [Deep 7 DRS Weight Frequency Investigation](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/Data_exploration_Rmarkdowns/Deep7_DRS.html)
-  
-  
-  6. [Shark Depredation Investigation](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/Data_exploration_Rmarkdowns/Shark_depredation.html)
 
 
 <!-- Do not edit below. This adds the Disclaimer and NMFS footer. -->
