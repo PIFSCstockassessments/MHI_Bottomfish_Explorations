@@ -7,7 +7,7 @@ Code for data exploration, preparation, standardization, analysis, and model dev
 ### Data Exploration
 Preliminary data exploration summaries for the BFISH survey, FRS, DRS, and shark depredation datasets can be found here:
 
-  1. [BFISH Opaka Length Frequency Investigations](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/Data_exploration_Rmarkdowns/BFISH_Length_Comp.html)
+  1. [BFISH Opaka Length Frequency Investigations](https://PIFSCstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/BFISH_Length_Comp.html)
   
   2. [Deep 7 Length Frequency Distribution Investigations](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep_6_Length_Comps.html)  
   
