@@ -1,0 +1,517 @@
+---
+title: "Deep 7 FRS Weight Comp Investigation"
+author: "Meg Oshima"
+date: "7/26/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gt)
+library(nmfspalette)
+library(sf)
+library(ggridges)
+
+knitr::opts_chunk$set(warning=FALSE,
+                message=FALSE,
+                echo=FALSE)  
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+
+
+HDAR_areas <- st_read("../Data/GIS/Shapefiles/DAR_Reporting_grids_all.shp")
+mhi_cropped <- st_crop(HDAR_areas, xmin = -162, xmax = -153,
+                          ymin = 17, ymax = 24)
+
+deep7_frs <- read.csv("../Data/Deep_7_FRS.csv")
+
+```
+
+
+### Full Weight Data Set  
+Data are FRS records for single catch fish with weights up to the state record weights for each species. Data were collected from 1948 to 2019. Only deep-sea handline gear type was used because it represents between 94 to 98% of the total pounds caught.  
+
+```{r}
+
+
+com_names <- c("Hapuupuu","Kalekale","Opakapaka","Ehu","Onaga", "Lehi","Gindai")
+st_records <- data.frame(COMMON_NAME = com_names,  RECORD = c(70,4,19,12,35,33,5))
+
+st_records %>% 
+  arrange(desc(RECORD)) %>% 
+  gt() %>% 
+  cols_label(
+    COMMON_NAME = "Common Name",
+    RECORD = "State Record (lbs)"
+  ) %>% 
+  tab_header(title = "State Records for Deep 7 Species")
+
+```
+
+<br>
+```{r}
+deep7_frs %>% 
+  ggplot(aes(x = COMMON_NAME, y = LBS)) +
+  geom_boxplot() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+```
+
+### Weight Compositions for Each Species  
+
+```{r}
+deep7_frs %>% 
+  ggplot(aes(x = LBS)) +
+  geom_density() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() 
+```
+
+```{r}
+
+deep7_frs %>% 
+  mutate(Decade = floor(FYEAR / 10) * 10,
+         Decade = factor(Decade, levels = seq(1940, 2010, by = 10))) %>% 
+  ggplot(aes(x = LBS, group = Decade, color = Decade)) +
+  geom_density() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+  labs(title = "Weight Distributions by Decade")
+```
+
+### Weight Compositions by Area Type
+
+```{r}
+Ehu.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Ehu"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Ehu")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Ehu.type, aes(x = 10, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Ehu")
+
+```
+
+
+```{r}
+Gin.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Gindai"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Gindai")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Gin.type, aes(x = 4, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Gindai")
+
+```
+
+
+```{r}
+Hapu.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Hapuupuu"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Hapuupuu")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Hapu.type, aes(x = 300, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Hapuupuu")
+
+```
+
+
+
+```{r}
+Kale.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Kalekale"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Kalekale")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Kale.type, aes(x = 3, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Kalekale")
+
+```
+
+
+```{r}
+Lehi.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Lehi"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Lehi")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Lehi.type, aes(x = 20, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Lehi")
+
+```
+
+
+```{r}
+Ona.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Onaga"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Onaga")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Ona.type, aes(x = 20, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Onaga")
+
+```
+
+```{r}
+Opa.type <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE, COMMON_NAME) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Opakapaka"))
+
+deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type, COMMON_NAME) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  filter(str_detect(COMMON_NAME, "Opakapaka")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = Opa.type, aes(x = 15, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Opakapaka")
+
+```
+
+For Ehu, Gindai, Hapuupuu, and Kalekale, there is not much difference in weight composition by area type. For Lehi, Onaga, and Opakapaka, inshore and coastal areas have very similar distributions but offshore shows different distribution. More, larger fishes.  
+
+### Weight Compositions by Island  
+
+
+```{r}
+
+ehu.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Ehu"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Ehu")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = ehu.island, aes(x = 10, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Ehu")
+
+
+```
+
+
+```{r}
+
+gin.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Gindai"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Gindai")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = gin.island, aes(x = 4, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Gindai")
+
+
+```
+
+
+
+```{r}
+
+hapu.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Hapuupuu"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Hapuupuu")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = hapu.island, aes(x = 300, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Hapuupuu")
+
+
+```
+
+
+```{r}
+
+kale.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Kalekale"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Kalekale")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = kale.island, aes(x = 3.5, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Kalekale")
+
+
+```
+
+
+```{r}
+
+lehi.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Lehi"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Lehi")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = lehi.island, aes(x = 30, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Lehi")
+
+
+```
+
+
+```{r}
+
+ona.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Onaga"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Onaga")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = ona.island, aes(x = 22, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Onaga")
+
+
+```
+
+
+
+```{r}
+
+opa.island <- deep7_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region, COMMON_NAME) %>% 
+  summarise(N = paste0("N = ", n())) %>% 
+  filter(str_detect(COMMON_NAME, "Opakapaka"))
+
+deep7_frs %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(COMMON_NAME, "Opakapaka")) %>% 
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = opa.island, aes(x = 17, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Opakapaka")
+
+
+```
+
+Lehi and Opakapaka are the only 2 species that have some regional differences in weight compositions. Niihau distributions are the most different from the other islands for both species.
+
+
+### Converting Weights to Length Comps  
+
+
+Using the equation $$L = {(W/\alpha)}^{1/\beta}$$ where:  
+
+  *   L = Length (cm)       
+  *   W = Weight (kg)       
+  *   $\alpha$ = scaling parameter (from Ault et al. 2018)        
+  *   $\beta$ = volumetric parameter (from Ault et al. 2018)    
+
+we converted weights to lengths and look at the distribution. 
+
+
+```{r}
+# convert from weight to length by L = (W/alpha)^(1/beta)
+
+camera_lengths <- read.csv("../Data/BFISH 2016-2019 Camera Lengths.csv")
+fishing_lengths <- read.csv("../Data/BFISH 2016-2019 Research Fishing Lengths.csv")
+
+deep_7 <- unique(camera_lengths$COMMON_NAME)[-c(8:9)]
+
+
+cam_7 <- camera_lengths %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  filter(COMMON_NAME %in% deep_7) %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  rename(SAMPLE_ID = "DROP_CD",
+         DEPTH = OFFICIAL_DEPTH_M) %>% 
+  select(PSU, 
+         SAMPLE_ID, 
+         Year, 
+         SPECIES_CD, 
+         COMMON_NAME, 
+         DEPTH, 
+         LENGTH_CM, 
+         Island) %>% 
+  mutate(Gear = "Camera")
+
+fish_7 <- fishing_lengths %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  filter(COMMON_NAME %in% deep_7) %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  rename(DEPTH = SAMPLE_MEAN_DEPTH_M) %>% 
+  select(PSU, 
+         SAMPLE_ID,
+         Year, 
+         SPECIES_CD, 
+         COMMON_NAME, 
+         DEPTH, 
+         LENGTH_CM, 
+         Island) %>% 
+  mutate(Gear = "Research Fishing")
+
+wl.params <- data.frame(
+  COMMON_NAME = c("Ehu", "Gindai", "Hapuupuu", "Kalekale", "Lehi", "Onaga", "Opakapaka"),
+  alpha = c(1.551E-05, 3.526E-05, 3.065E-05, 2.243E-05, 1.298E-04, 6.005E-05, 2.311E-05),
+  beta = c(3.026, 2.859, 2.884, 2.932, 2.458, 2.673, 2.928))
+
+deep7_frs %>% 
+  mutate(kg = (LBS *0.45359237)) %>% 
+  merge(wl.params, by = "COMMON_NAME") %>% 
+  mutate(Length = (kg/alpha)^(1/beta)) %>% 
+  ggplot(aes(x = Length)) +
+  geom_density(colour = "#C95E15") +
+  geom_density(data = cam_7, aes(x = LENGTH_CM), color = "#00467F") +
+  geom_density(data = fish_7, aes(x = LENGTH_CM), color = "#157253") +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+  labs(caption = "Blue line represents the BFISH camera survey data, green line represents the BFISH research fishing data, \n and orange line represents the converted lengths from FRS weights data.")
+  
+```
+

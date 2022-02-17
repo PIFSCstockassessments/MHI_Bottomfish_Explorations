@@ -1,0 +1,238 @@
+---
+title: "Deep 7 DRS Investigation"
+author: "Meg Oshima"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gt)
+library(nmfspalette)
+library(sf)
+library(ggridges)
+
+knitr::opts_chunk$set(warning=FALSE,
+                message=FALSE,
+                echo=FALSE)  
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+
+
+```
+
+```{r}
+deep7_drs <- read.csv("../Data/Data for Meg/DRS_deep7.csv")
+deep7_drs <- deep7_drs %>% 
+  select(-c(Year, X)) %>% 
+  rename("Year" = "FYear") %>% 
+  filter(str_detect(data_source, "Online Fishing Reports", negate = TRUE))
+
+deep7_frs <- read.csv("../Data/Deep_7_FRS.csv")
+
+drs_sub <- deep7_drs %>% 
+  select(Year, COMMON_NAME, pounds_bought) %>% 
+  rename("LBS" = "pounds_bought") %>% 
+  mutate(data_set = "DRS")
+
+frs_sub <- deep7_frs %>% 
+  select(FYEAR, COMMON_NAME, LBS) %>% 
+  rename("Year" = "FYEAR") %>% 
+  mutate(data_set = "FRS")
+
+drs_frs <- bind_rows(drs_sub, frs_sub)
+
+```
+
+### Complete Catch Weight Data Set  
+Data are DRS records for single catch fish with weights up to the state record weights for each species. Data were collected from 2000 to 2021 (fishing years 2000 - 2022). Three data sources were included (*dealer reporting system* [n = 165,501], *online dealer reports* [n = 12,500], and *online fishing reports* [n = 56]) but only DRS and ODR were included in the following analyses. 186 dealer ID numbers were in the dataset (199 before removal of OFR) and the top 5 dealers with the most records were **13174** (n = 148,308), **13139** (n = 8,795), **13183** (n = 5,342), **12989** (n = 4,661), and **13013** (n = 2,948).
+
+```{r}
+
+
+
+com_names <- c("Hapuupuu","Kalekale","Opakapaka","Ehu","Onaga", "Lehi","Gindai")
+st_records <- data.frame(COMMON_NAME = com_names,  RECORD = c(70,4,19,12,35,33,5))
+
+st_records %>% 
+  arrange(desc(RECORD)) %>% 
+  gt() %>% 
+  cols_label(
+    COMMON_NAME = "Common Name",
+    RECORD = "State Record (lbs)"
+  ) %>% 
+  tab_header(title = "State Records for Deep 7 Species")
+
+```
+
+<br>
+
+
+```{r}
+
+drs_frs %>% 
+  group_by(data_set, COMMON_NAME) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = "data_set", values_from = "N") %>% 
+  arrange(desc(DRS)) %>% 
+  gt() %>% 
+  fmt_number(
+    columns = 2:3,
+    decimals = 0,
+    use_seps = TRUE, 
+    sep_mark = ",") %>% 
+   summary_rows(
+    columns = 2:3,
+    fns = list(
+      Total = "sum")) %>% 
+  cols_label(COMMON_NAME = "Common Name") %>% 
+  tab_header(title = "Number of Weight Records in DRS and FRS")
+
+drs_frs %>% 
+  ggplot(aes(x = COMMON_NAME, y = LBS, color = data_set)) +
+  geom_boxplot() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+   labs(title = "DRS vs FRS Reported Weights")
+```
+
+
+
+### Weight Distributions for Each Species  
+
+
+```{r}
+
+drs_frs %>% 
+  group_by(COMMON_NAME) %>% 
+  ggplot(aes(x = LBS, color = data_set)) +
+  geom_density(size = .65) + 
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+  labs(title = "DRS vs FRS Weight Distributions")
+
+```
+<br>  
+
+
+```{r}
+deep7_drs %>% 
+  mutate(Decade = floor(Year / 10) * 10,
+         Decade = factor(Decade, levels = seq(2000, 2020, by = 10))) %>% 
+  ggplot(aes(x = pounds_bought, y = Decade, color = Decade, fill = Decade)) +
+  geom_density_ridges(alpha = 0.5) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  scale_fill_nmfs("regional web") +
+  theme_classic() +
+  labs(title = "Weight Distributions by Decade")
+
+
+deep7_drs %>% 
+  mutate(Decade = floor(Year / 10) * 10,
+         Decade = factor(Decade, levels = seq(2000, 2020, by = 10))) %>% 
+  group_by(COMMON_NAME, Decade) %>% 
+  summarise(N = n()) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = "Decade", values_from = "N") %>% 
+  gt() %>% 
+  fmt_number(
+    columns = 2:4,
+    decimals = 0,
+    use_seps = TRUE, 
+    sep_mark = ",") %>% 
+  cols_label(COMMON_NAME = "Common Name") %>% 
+  tab_header(title = "Number of Weight Records in DRS by Decade")
+
+```
+
+
+```{r}
+drs_list <- deep7_drs %>% 
+  group_split(COMMON_NAME)  
+
+names(drs_list) <- c("Ehu", "Gindai", "Hapuupuu", "Kalekale", "Lehi", "Onaga", "Opakapaka")
+
+ggplot(aes(x = pounds_bought), data = drs_list[[1]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[1]))
+
+```
+
+!![figure from Jason Helyer](./DRS_Figures_Jason/ehu_size_freq.jpg)
+
+```{r}
+
+ggplot(aes(x = pounds_bought), data = drs_list[[2]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[2]))
+
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/Gindai_size_freq.jpg)
+
+```{r}
+ggplot(aes(x = pounds_bought), data = drs_list[[3]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[3]))
+
+
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/Hapupu_size_freq.jpg)
+
+
+```{r}
+ggplot(aes(x = pounds_bought), data = drs_list[[4]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[4]))
+
+
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/Kale_size_freq.jpg)
+
+```{r}
+ggplot(aes(x = pounds_bought), data = drs_list[[5]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[5]))
+
+
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/Lehi_size_freq.jpg)
+
+```{r}
+ggplot(aes(x = pounds_bought), data = drs_list[[6]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[6]))
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/Onaga_size_freq.jpg)
+
+```{r}
+ggplot(aes(x = pounds_bought), data = drs_list[[7]]) +
+  geom_density(fill = "#D0D0D0") +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = paste(names(drs_list)[7]))
+```
+
+![figure from Jason Helyer](./DRS_Figures_Jason/paka_size_freq.jpg)

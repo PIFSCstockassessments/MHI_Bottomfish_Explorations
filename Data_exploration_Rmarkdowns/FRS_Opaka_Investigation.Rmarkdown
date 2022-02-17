@@ -1,0 +1,323 @@
+---
+title: "Opaka FRS Weight Comps"
+author: "Meg Oshima"
+date: "7/7/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(gt)
+library(nmfspalette)
+library(sf)
+
+knitr::opts_chunk$set(warning=FALSE,
+                message=FALSE,
+                echo=FALSE)  
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+
+
+HDAR_areas <- st_read("../Data/GIS/Shapefiles/DAR_Reporting_grids_all.shp")
+mhi_cropped <- st_crop(HDAR_areas, xmin = -162, xmax = -153,
+                          ymin = 17, ymax = 24)
+
+deep7_frs <- read.csv("../Data/Deep_7_FRS.csv")
+
+
+```
+
+### Full Weight Data Set  
+Data are FRS records for single catch fish with a weight of < 19lbs. Data were collected from 1948 to 2019. Only deep-sea handline (? gear type = 3) gear type was used because it represents 97% of the pounds caught.
+
+```{r}
+
+opaka_frs <- deep7_frs %>% 
+  filter(str_detect(COMMON_NAME, "Opakapaka")) %>% 
+  mutate(Decade = floor(FYEAR / 10) * 10,
+         Decade = factor(Decade, levels = seq(1940, 2010, by = 10))) %>% 
+  select(-X) %>% 
+  filter(!is.na(LBS))
+
+opaka_frs %>% 
+  ggplot(aes(x = LBS)) +
+  geom_density() +
+  theme_classic() +
+  labs(title = "Weight frequecy for Opakapaka from 1948 - 2019.",
+       caption = "Records were restricted to catches with one reported fish and weight < 19 lbs.")
+
+
+opaka_frs %>% 
+  ggplot(aes(x = LBS)) +
+  geom_histogram(aes(y = ..density..), fill = "#00467F", alpha = .5, binwidth = .5, colour = "black") +
+  geom_density(size = 1) +
+  theme_classic() +
+  labs(title = "Weight frequecy for Opakapaka from 1948 - 2019.",
+       caption = "Records were restricted to catches with one reported fish and weight < 19 lbs.")
+
+
+```
+
+### Weight Compositions By Decades 
+<br>
+```{r}
+
+opaka_frs %>% 
+  group_by(Decade) %>% 
+  summarise(N = n(), 
+            "Min Weight (lbs)" = min(LBS),
+            "Max Weight (lbs)" = max(LBS)) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Single Opaka Catch Records by Decade") 
+
+
+```
+
+
+<br>  
+
+```{r}
+library(ggridges)
+
+opaka_frs %>%  
+  ggplot(aes(x = LBS, group = Decade, color = Decade)) +
+  geom_density() +
+  theme_classic() +
+  labs(title = "Weight distributions by decade")
+
+N.decades <- opaka_frs %>% 
+  group_by(Decade) %>% 
+  summarise(N = paste("N = ", n(), sep = " "))
+
+opaka_frs %>% 
+  ggplot(aes(x = LBS, y = Decade, fill = Decade)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = N.decades, aes(x = 18, y = Decade, label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  labs(title = "Weight distribuitons by decade") +
+  scale_y_discrete(limits=rev) +
+  scale_fill_nmfs("regional web")
+
+
+
+```
+
+From the 80's on, the weight frequencies are very similar (later years have slightly more peaked distribution). In the earlier years it seems like weight distributions were flatter and more heavier fish were caught. 
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1940) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1940-1949")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1950) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1950-1959")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1960) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1960-1969")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1970) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1970-1979")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1980) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1980-1989")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 1990) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 1990-1999")
+
+```
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 2000) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 2000-2009")
+
+```
+
+
+
+```{r}
+opaka_frs %>% 
+  filter(Decade == 2010) %>% 
+  mutate(Year = factor(FYEAR)) %>% 
+  ggplot(aes(x = LBS, y = Year, fill = Year)) +
+  geom_density_ridges(alpha = .5) +
+  scale_y_discrete(limits=rev) +
+  theme_classic() +
+  scale_fill_nmfs("regional web") +
+  labs(title = "Weight distributions for 2010-2019")
+
+```
+
+
+### Weight Compositions by Area Type  
+
+```{r}
+
+N.type <- opaka_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(TYPE) %>% 
+  rename(Type = "TYPE") %>% 
+  summarise(N = paste0("N = ", n()))
+
+opaka_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>%
+  mutate(Type = factor(TYPE)) %>% 
+  group_by(Type) %>% 
+  filter(!is.na(LBS)) %>%
+  filter(str_detect(Type, "MHI")) %>% 
+  ggplot(aes(x = LBS, y = Type, fill = Type)) +
+  geom_density_ridges(alpha = .5) +
+  geom_text(data = N.type, aes(x = 15, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web")
+
+```
+
+
+### Weight Composition by Island  
+
+```{r}
+
+N.island <- opaka_frs %>% 
+  merge(mhi_cropped, by.x = "AREA", by.y = "AREA_ID", all = TRUE) %>% 
+  filter(!is.na(LBS)) %>%
+  group_by(Region) %>% 
+  summarise(N = paste0("N = ", n()))
+
+opaka_frs %>% 
+  filter(!is.na(LBS)) %>%
+  ggplot(aes(x = LBS, y = Region, fill = Region)) +
+  geom_density_ridges(alpha = .5, show.legend = FALSE) +
+  geom_text(data = N.island, aes(x = 18, y = , label = N), position = position_nudge(y = +.5)) +
+  theme_classic() +
+  scale_fill_nmfs("regional web")
+
+
+```
+
+
+
+### Converting Weights to Length Comps  
+
+
+Using the equation $$L = {(W/\alpha)}^{1/\beta}$$ where:  
+
+  *   L = Length (cm)       
+  *   W = Weight (kg)       
+  *   $\alpha$ = scaling parameter (from Ault et al. 2018)        
+  *   $\beta$ = volumetric parameter (from Ault et al. 2018)    
+
+we converted weights to lengths and look at the distribution. Compared to the distribution from the BFISH camera survey, the Opaka reported in the FRS data set generally fall on the higher end of the distribution.  
+
+```{r}
+# convert from weight to length by L = (W/alpha)^(1/beta)
+
+camera_lengths <- read.csv("../Data/BFISH 2016-2019 Camera Lengths.csv")
+fishing_lengths <- read.csv("../Data/BFISH 2016-2019 Research Fishing Lengths.csv")
+sp_code <- "PRFI"
+
+cam <- camera_lengths %>% 
+filter(str_detect(SPECIES_CD, sp_code)) %>% 
+filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+select(-X)
+
+fish <- fishing_lengths %>% 
+  filter(str_detect(SPECIES_CD, sp_code)) %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  select(-X) %>% 
+  filter(SAMPLE_MEAN_DEPTH_M >= 75 & SAMPLE_MEAN_DEPTH_M <= 250)
+
+alpha <- 2.311E-05
+beta <- 2.928
+
+opaka_frs %>% 
+  mutate(
+    kg = (LBS *0.45359237), 
+    Length = (kg/alpha)^(1/beta)) %>% 
+  ggplot(aes(x = Length)) +
+  geom_density(colour = "#C95E15") +
+  geom_density(data = cam, aes(x = LENGTH_CM), color = "#00467F") +
+  geom_density(data = fish, aes(x = LENGTH_CM), color = "#157253") +
+  theme_classic() +
+  labs(caption = "Blue line represents the BFISH camera survey data, green line represents the BFISH research fishing data, \n and orange line represents the converted lengths from FRS weights data.")
+  
+```
+

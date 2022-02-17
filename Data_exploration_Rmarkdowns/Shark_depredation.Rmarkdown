@@ -1,0 +1,908 @@
+---
+title: "Deep 7 Shark Depredation Investigation"
+author: "Meg Oshima"
+date: "10/21/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+library(tidyverse)
+library(lubridate)
+library(Hmisc)
+library(gt)
+library(nmfspalette)
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+
+file_names <-  paste("../Data/Data for Meg/FRS", list.files(path = "../Data/Data for Meg/FRS"), sep = "/")
+
+meta <- file_names %>% 
+  str_subset("AREA|SPECIES") %>% 
+  map(read_csv)
+
+frs_names <-  file_names %>% 
+  str_subset("AREA|SPECIES", negate = T)
+
+frs_dep <- frs_names %>%
+  map_dfr(read_csv, col_types = cols("buoy" = "c", 
+                                     "vessel" = "c",
+                                     "uscg_ha_no" = "d",
+                                     "subarea" = "c",
+                                     "chartered" = "f",
+                                     "port_dprtr" = "f", 
+                                     "port_land" = "f",
+                                     "gear" = "f")) 
+deep7 <- c("Ehu", 
+           "Lehi", 
+           "Kalekale", 
+           "Hapuupuu", 
+           "Opakapaka", 
+           "Gindai", 
+           "Onaga", 
+           "Uku")
+
+frs_deep7 <- frs_dep %>%  
+  select(license, 
+         trip_beg, 
+         trip_end,
+         fyear, 
+         vessel, 
+         port_dprtr, 
+         port_land, 
+         chartered, 
+         fished, 
+         wind_speed, 
+         buoy, 
+         area, 
+         subarea, 
+         depth_beg,
+         depth_end,
+         fname,
+         gear, 
+         hours, 
+         hooks, 
+         species,
+         caught, 
+         lbs, 
+         lost,
+         release,
+         number_lost_to_predator, 
+         predator) %>%
+  rename("SPECIES" = "species") %>%
+  filter(fished >= as.Date("2002-10-01")) %>%
+  mutate(Year = year(fished),
+         Month = month(fished)) %>%
+  left_join(meta[[1]], by = "area") %>%
+  left_join(meta[[2]], by = "SPECIES") %>% 
+  filter(str_detect(Sp, paste0(deep7, collapse = "|"))) %>% 
+  filter(str_detect(REGION, "MHI")) %>%
+  mutate(number_lost_to_predator = ifelse(is.na(number_lost_to_predator), 0, number_lost_to_predator)) 
+  
+remove_recs <- frs_deep7 %>% 
+  unite(col = "tripID", c(license, vessel, fished), sep = "_") %>% 
+  filter(caught == 0 & number_lost_to_predator == 0 & release == 0 & lbs > 0)
+
+frs_deep7_clean <- frs_deep7 %>% 
+  unite(col = "tripID", c(license, vessel, fished), sep = "_") %>% 
+  anti_join(remove_recs, by = c("tripID", 
+                                "Sp", 
+                                "lbs", 
+                                "caught", 
+                                "number_lost_to_predator")) %>% 
+  mutate(lbs = ifelse(caught == 0 & number_lost_to_predator > 0, NA, lbs)) %>% 
+  filter(!is.na(lbs)|!is.na(caught)) %>% 
+  filter(fyear < 2022)
+
+```
+
+## Data structure
+
+The data used in this analysis was requested from WPacFIN and is the FRS dataset from 2002 to 2021. Depredation data was not collected until Oct. 1, 2002. The data are filtered to include only areas fished around the main Hawaiian Islands (area = "MHI") and the deep 7 and Uku species. 15 gear-types are recorded, but the majority of the records are for gear 3 (n = 126,045).
+
+```{r }
+summary(frs_deep7_clean)
+
+```
+
+## QA/QC
+
+Some issues within the dataset are:
+
+-   instances of catch = 0, number_lost_to_predator = 0, and released = 0, but weight != 0. **Recommend removing these records** <br>
+
+```{r warning=FALSE}
+frs_deep7 %>% 
+  select(fished, Sp, caught, number_lost_to_predator, release, lbs) %>% 
+  filter(caught == 0 & lbs > 0) %>% 
+  head() %>% 
+  gt()
+ 
+```
+
+<br>
+
+-   instances of catch is NA but number_lost_to_predator and lbs \> 0. Would this be cases of the fishermen guessing at the weight that the lost fish were? **Recommend removing these records unless more information is known.**\
+    <br>\
+
+```{r }
+frs_deep7 %>% 
+  unite(col = "tripID", c(license, vessel, fished), sep = "_") %>%
+  select(tripID, Sp, caught, lbs, number_lost_to_predator, release, predator) %>% 
+  filter(is.na(caught) & number_lost_to_predator > 0 & lbs > 0) %>% 
+  gt()
+```
+
+```{r warning=FALSE}
+nrow.na <- frs_deep7 %>% filter(is.na(caught)) %>% nrow()
+```
+
+<br>
+
+-   instances of catch being NA *(nrow = `r nrow.na`)*. Could assume NA (blank field) would be 0 catch.
+
+## Who is reporting depredation?
+
+```{r warning=FALSE}
+n.fishers <- length(unique(frs_deep7$license))
+
+n.reporters <- frs_deep7_clean %>% 
+  filter(number_lost_to_predator > 0) %>% 
+  distinct(tripID) %>% 
+  separate(tripID, into = c("license", "vessel", "date"), sep = "_") %>% 
+  group_by(license) %>% 
+  summarise(n = n())
+
+reports_10 <- n.reporters %>% 
+  filter(n > 10) %>% 
+  nrow()
+reports_50 <- n.reporters %>% 
+  filter(n > 50) %>% 
+  nrow()
+max.reports <- max(n.reporters$n)
+
+mean.annual.reports <- frs_deep7_clean %>% 
+  distinct(tripID, .keep_all = TRUE) %>% 
+  filter(number_lost_to_predator > 0 & fyear < 2022) %>% 
+  group_by(fyear) %>% 
+  summarise(n = n()) %>%
+  summarise(mean = mean(n)) %>% 
+  pull(mean)
+mean.annual.reports <- round(mean.annual.reports, 2)
+
+n.trips.pred <- frs_deep7_clean %>% 
+  group_by(tripID) %>% 
+  filter(number_lost_to_predator > 0) %>% 
+  distinct(tripID) %>% 
+  nrow()
+
+n.trips.tot <- frs_deep7_clean %>% 
+  group_by(tripID) %>% 
+  distinct(tripID) %>% 
+  nrow()
+
+percent.trips.dep <- round(n.trips.pred/n.trips.tot, 2)*100
+
+                                              
+```
+
+`r percent.trips.dep`% of all trips reported some loss of catch due to predators. Out of the `r n.fishers` unique fishing licenses, `r reports_10` have reported more than 10 instances with fish lost to predator over the entire time period and `r reports_50` fishers have reported more than 50 instances of fish lost to predator over the entire time period. The max number of reports by one license ID is `r max.reports` The mean number of trips with fish reported lost to predators is `r mean.annual.reports` trips per year.
+
+```{r}
+n.reporters %>% 
+  ggplot(aes(x = n)) +
+  geom_histogram(fill = "#306A7B", alpha = .7) +
+  theme_classic() +
+  labs(x = "Number of Trips",
+       title = "Distribution of number of trips with depredation reported by individual fishermen")
+  
+frs_deep7_clean %>%
+    separate(tripID, into = c("license", "vessel", "date"), sep = "_") %>%
+    group_by(license, Sp) %>%
+    filter(number_lost_to_predator > 0) %>%
+    summarise(n = n()) %>%  #number of times individual reported a species lost, not the total count that were lost for each species
+    ggplot(aes(x = n, fill = Sp)) +
+    geom_histogram(alpha = .7, show.legend = FALSE) +
+    theme_classic() +
+    facet_wrap(~ Sp, scales = "free") +
+    scale_fill_nmfs("regional web") +
+    labs(title = "Frequency of fishers reporting depredation per species",
+         caption = "n represents the number of times individuals reported a species lost, \n not the total count that were lost for each species.")
+
+```
+
+## Depredation Over Time
+
+```{r}
+ frs_deep7_clean %>% 
+    mutate(Group = ifelse(str_detect(Sp, "Uku"), "Uku", "Deep7")) %>% 
+    group_by(fyear, tripID, Group) %>% 
+    filter(number_lost_to_predator > 0) %>% 
+    select(fyear, tripID, caught, number_lost_to_predator, Sp) %>%
+    slice_head(n = 1) %>% 
+    ungroup() %>% 
+    group_by(fyear, Sp) %>% 
+    summarise(n = n()) %>% 
+    ggplot(aes(x = fyear, y = n, fill = Sp)) + 
+    geom_col(alpha = 0.7) + 
+    theme_classic() +
+    scale_fill_nmfs("regional web") +
+    labs(title = "Total number of fishing trips with reported fish lost to predation each year", 
+         caption = "Fishing trip is assumed to be a unique combination of license, vessel, and day fished", 
+         x = "Fishing Year", 
+         y = "Number of Trips")
+```
+
+
+```{r}
+frs_deep7_clean %>% 
+  group_by(Sp, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            caught = sum(caught, na.rm = TRUE),
+            release = sum(release, na.rm = TRUE),
+            dep_rate = (lost/(lost+caught+release))*100) %>% 
+  ggplot(aes(x = fyear, y = dep_rate, color = Sp)) +
+  geom_line(size = 1.2, alpha = .65, show.legend = FALSE) +
+  facet_wrap(~Sp) +
+  theme_classic() +
+  labs(x = "Fishing Year",
+       y = "Depredation Rate",
+       title = "Depredation rates over time by species")
+
+frs_deep7_clean %>% 
+  group_by(fyear, Sp) %>% 
+  summarise(annual_catch = sum(caught, na.rm = TRUE), 
+            annual_dep = sum(number_lost_to_predator, na.rm = TRUE),
+            annual_rel = sum(release, na.rm = TRUE),
+            catch_dep_ratio = annual_dep/(annual_dep + annual_catch + annual_rel)) %>% 
+  filter(str_detect(Sp, "Opakapaka|Onaga|Uku")) %>% 
+  ggplot(aes(x = fyear, y = catch_dep_ratio, color = Sp)) +
+  geom_line(size = 1.2, alpha = .7) + 
+  theme_classic() +
+  labs(title = "Proportion of catch lost to predators",
+       x = "Fishing Year", 
+       y = "Proportion of Catch",
+       caption = "Catch records from 2002-2021")
+
+```
+
+The proportion of catch lost to predators for the three main species that experience depredation (Opaka, Onaga, and Uku) is shown in the figure above. The proportion $P$ is calculated by $P = D_y/(D_y + C_y + R_y)$ where $D_y$ is the total number of fish per species lost to predators in year $y$, $C_y$ is the total number of fish per species caught in year $y$, and $R_y$ is the number released in year $y$. *Note: most release is 0 so there is minimal difference between including and excluding released but included it to be consistent with other studies.*
+
+```{r}
+## percent of depredation total by species (table and figure)
+  frs_deep7_clean %>% 
+    group_by(Sp) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = round((lost/(catch + lost + rel))*100,2)) %>% 
+    arrange(desc(prop_dep)) %>% 
+    gt() %>% 
+    cols_label(
+      Sp = "Species",
+      lost = "Number Lost",
+      catch = "Number Caught", 
+      rel = "Number Released",
+      prop_dep = "Percent Lost to Predation"
+    ) %>% 
+    tab_header(title = "Total percent of catch lost to predation by species")
+    
+```
+
+## Depredation by Location
+
+#### Is the majority of depredation occurring in Penguin Banks?
+
+```{r}
+frs_deep7_clean %>% 
+  group_by(Sp, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = round(100*(lost/(lost + catch + rel)), 2)) %>% 
+  arrange(desc(prop_dep)) %>% 
+  gt() %>% 
+  cols_label(
+    Sp = "Species",
+    lost = "Total Lost",
+    rel = "Total Released",
+    catch = "Total Caught",
+    prop_dep = "Percent of Catch Lost"
+  ) %>% 
+  tab_style(style = list(cell_text(weight = 'bold')), 
+            locations = cells_row_groups(groups = c("Onaga", "Uku", "Opakapaka", "Lehi", "Hapuupuu", "Kalekale", "Ehu", "Gindai")))
+```
+
+
+Spatial trends are not consistent among species. For Onaga and Uku, the highest percent of catch lost to depredation (11% and 8% respectively) is at Penguin Banks area but for Opakapaka and Lehi, the highest depredation is off Ohau (8% and 6% respectively). Ehu and Gindai also experience the highest depredation rates at Penguin Banks (2.5% and 1.6% respectively), and Hapuupuu and Kalekale experience highest depredation rates off Kauai.  
+
+
+```{r}
+  frs_deep7_clean %>% 
+  filter(str_detect(Sp, "Opakapaka")) %>% 
+    group_by(fyear, Island) %>% 
+    select(tripID, fyear, caught, number_lost_to_predator, Sp, Island, release) %>% 
+    summarise(n = sum(number_lost_to_predator, na.rm = TRUE)) %>% 
+    ggplot(aes(x = fyear, y = n, color = Island)) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) + 
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    theme_classic() +
+    labs(title = "Total number of Opakapaka lost to predators",
+         x = "Fishing Year",
+         y = "N")
+
+mean_props <- frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Opakapaka")) %>% 
+    group_by(Island, fyear) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Island) %>% 
+  summarise(mean_prop = mean(prop_dep))
+
+
+  frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Opakapaka")) %>% 
+    group_by(fyear, Island) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+    ggplot(aes(x = fyear, y = prop_dep, color = Island)) +
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+    geom_hline(data = mean_props, aes(yintercept = mean_prop, color = Island), alpha = .5, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    labs(title = "Proportion of predation on Opakapaka Catches by Island", 
+         x = "Fishing Year",
+         y = "Proportion of catch lost to predator",
+         caption = "Light solid line represents the mean proportion from 2002 to 2021.") + 
+  theme_classic()
+```
+
+```{r}
+  frs_deep7_clean %>% 
+  filter(str_detect(Sp, "Onaga")) %>% 
+    group_by(fyear, Island) %>% 
+    select(tripID, fyear, caught, number_lost_to_predator, Sp, Island) %>% 
+    summarise(n = sum(number_lost_to_predator, na.rm = TRUE)) %>% 
+    ggplot(aes(x = fyear, y = n, color = Island)) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) + 
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    theme_classic() +
+    labs(title = "Total number of Onaga lost to predators",
+         x = "Fishing Year",
+         y = "N")
+
+mean_props <- frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Onaga")) %>% 
+    group_by(Island, fyear) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Island) %>% 
+  summarise(mean_prop = mean(prop_dep))
+
+frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Onaga")) %>%
+    group_by(fyear, Island) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+    ggplot(aes(x = fyear, y = prop_dep, color = Island)) +
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+    geom_hline(data = mean_props, aes(yintercept = mean_prop, color = Island), alpha = .5, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    labs(title = "Proportion of predation on Onaga Catches by Island", 
+         x = "Fishing Year",
+         y = "Proportion of catch lost to predator",
+         caption = "Light solid line represents the mean proportion from 2002 to 2021.") +
+  theme_classic()
+```
+
+```{r}
+  frs_deep7_clean %>% 
+  filter(str_detect(Sp, "Uku")) %>% 
+    group_by(fyear, Island) %>% 
+    select(tripID, fyear, caught, number_lost_to_predator, Sp, Island) %>% 
+    summarise(n = sum(number_lost_to_predator)) %>% 
+    ggplot(aes(x = fyear, y = n, color = Island)) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) + 
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    theme_classic() +
+    labs(title = "Total number of Uku lost to predators",
+         x = "Fishing Year",
+         y = "N")
+
+
+mean_props <- frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Uku")) %>% 
+    group_by(Island, fyear) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Island) %>% 
+  summarise(mean_prop = mean(prop_dep))
+
+frs_deep7_clean %>% 
+    filter(str_detect(Sp, "Uku")) %>% 
+    group_by(fyear, Island) %>% 
+    summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+              catch = sum(caught, na.rm = TRUE),
+              rel = sum(release, na.rm = TRUE),
+              prop_dep = lost/(catch + lost + rel)) %>% 
+    ggplot(aes(x = fyear, y = prop_dep, color = Island)) +
+    geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+    geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+    geom_hline(data = mean_props, aes(yintercept = mean_prop, color = Island), alpha = .5, show.legend = FALSE) +
+    facet_wrap(~Island) +
+    labs(title = "Proportion of predation on Uku Catches by Island", 
+         x = "Fishing Year",
+         y = "Proportion of catch lost to predator",
+         caption = "Light solid line represents the mean proportion from 2002 to 2021.") +
+  theme_classic()
+```
+
+## Depredation by Trip Attributes
+
+#### Gear Type
+
+```{r}
+frs_deep7_clean %>% 
+  group_by(gear, Sp) %>% 
+  select(fyear, tripID, gear, Sp, number_lost_to_predator, caught, release) %>% 
+  summarise(caught = sum(caught, na.rm = TRUE), 
+            lost = sum(number_lost_to_predator, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(lost + caught + rel)) %>% 
+  ggplot(aes(x = gear, y = prop_dep)) + 
+  geom_col(fill = "#306A7B", alpha = .7) +
+  theme_classic() +
+  labs(title = "Proportion of Catch Lost to Predators by Gear Type", 
+       x = "Gear",
+       y = "Proportion of Catch Lost")
+```
+
+
+```{r}
+frs_deep7_clean %>% 
+  group_by(gear, Sp) %>% 
+  summarise(caught = sum(caught, na.rm = TRUE),
+            lost = sum(number_lost_to_predator, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(lost+caught + rel)) %>% 
+ # filter(prop_dep > 0) %>% 
+  ggplot(aes(x = gear, y = prop_dep, fill = Sp)) +
+  geom_col(alpha = .7) +
+  scale_fill_nmfs("regional web") +
+  theme_classic() +
+  labs(title = "Proportion of catch lost to predator by gear type per species",
+       x = "Gear", 
+       y = "Proportion of Catch Lost")
+
+
+gear.types <- c('4' = "Inshore Handline (4)",
+                '3' = "Deep-Sea Handline (3)",
+                "5" = "Set Line (5)",
+                "9" = "Palu Ahi (9)",
+                "10" = "Casting (10)",
+                "61" = "Trolling Lures (61)")
+
+
+frs_deep7_clean %>% 
+  group_by(gear, Sp) %>% 
+  summarise(caught = sum(caught, na.rm = TRUE),
+            lost = sum(number_lost_to_predator, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(lost+caught + rel)) %>% 
+  filter(gear == 3| gear == 4 | gear == 5 | gear == 9 | gear == 10 | gear == 61) %>% 
+  ggplot(aes(x = Sp, y = prop_dep, fill = Sp)) +
+  geom_col(alpha = .7, position = "dodge") +
+  facet_wrap(~gear, scales = "free", nrow = 3, labeller = as_labeller(gear.types)) +
+  scale_x_discrete(guide = guide_axis(n.dodge=2))+
+  scale_fill_nmfs("regional web") +
+  theme_classic() +
+  labs(title = "Gear with multiple species experiencing depredation",
+       x = "Species",
+       y = "Proportion of Catch Lost")
+
+```
+
+```{r}
+
+## gear 6
+n.6 <- frs_deep7_clean %>% 
+  filter(gear == 6) %>% 
+  nrow()
+
+years.6 <- frs_deep7_clean %>% 
+  filter(gear == 6) %>% 
+  group_by(fyear) %>% 
+  summarise(n = n())
+
+sps.6 <- frs_deep7_clean %>% 
+  filter(gear == 6) %>% 
+  group_by(Sp) %>% 
+  summarise(caught = sum(caught, na.rm = TRUE),
+            lost = sum(number_lost_to_predator, na.rm = TRUE)) %>% 
+  arrange(desc(caught))
+
+## gear 9
+sum.9 <- frs_deep7_clean %>% 
+  filter(gear == 9) %>% 
+  group_by(Sp) %>% 
+  summarise(n = sum(caught, na.rm = TRUE), 
+            lost = sum(number_lost_to_predator, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(lost+n+rel)) %>% 
+  arrange(desc(n)) 
+
+top3.9 <- sum.9 %>% slice(1:3)
+## gear 10
+sum.10 <- frs_deep7_clean %>%
+  filter(gear == 10) %>% 
+  group_by(Sp) %>% 
+  summarise(caught = sum(caught, na.rm = TRUE),
+            lost = sum(number_lost_to_predator, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(lost+caught+rel)) 
+ 
+```
+
+Gear types 3 (deep-sea handline), 6 (trolling), 9 (Palu Ahi, tuna handline), and 10 (casting) have the highest proportions of catch lost to predators. For gear 6, there were `r n.6` individual fishing trips recorded using that gear type in `r years.6$fyear[1]` (n = `r years.6$n[1]`) and `r years.6$fyear[2]` (n = `r years.6$n[2]`). The species caught on those trips with gear 6 included `r sps.6$Sp[1]` (n = `r sps.6$caught[1]`), `r sps.6$Sp[2]` (n = `r sps.6$caught[2]`), and `r sps.6$Sp[3]` (n = `r sps.6$caught[3]`) and with only `r sps.6$lost[1]` Onaga reported as lost to a predator. Gear type 3 is the most commonly used and catches were highest for this gear for all species. With gear 9, `r top3.9$Sp[1]`, `r top3.9$Sp[2]`, and `r top3.9$Sp[3]` catches were highest (n = `r top3.9$n[1]`, n = `r top3.9$n[2]`, and n = `r top3.9$n[3]` respectively) but Onaga had the highest proportion of catch lost to predators (prop_dep = `r round(max(sum.9$prop_dep), 4)`). Gear 10 caught `r paste(sum.10$Sp, collapse = ", ")` with the majority being `r sum.10[which.max(sum.10$caught),1]`. The species that experienced the highest proportion of catch lost to depredation was  `r sum.10[which.max(sum.10$prop_dep),1]`, with `r max(sum.10$lost)` fish lost to a predator. With gear 10, the proportion of Uku catch lost to predators was `r round(sum.10$prop_dep[which(sum.10$Sp == "Uku")], 4)`. 
+
+#### Depth
+
+For all instances where depth (beginning [blue dots] or ending [red dots]) was recorded, there were no records of fish being lost to predators.
+
+```{r warning=FALSE}
+frs_deep7_clean %>% 
+  select(tripID, Sp, number_lost_to_predator, gear, depth_beg, depth_end) %>% 
+  ggplot(aes(x = number_lost_to_predator, y = depth_beg)) +
+  geom_point(color = "#00467F", alpha = .7) + 
+  geom_point(aes(y = depth_end), color = "#B85E31", alpha = .7) +
+  theme_classic() +
+  labs(y = "depth")
+
+
+```
+
+#### Wind Speed  
+
+For all instances where wind speed was recorded, there were no records of fish being lost to predators.
+```{r warning = FALSE}
+frs_deep7_clean %>% 
+  select(tripID, Sp, number_lost_to_predator,  wind_speed) %>% 
+  ggplot(aes(x = number_lost_to_predator, y = wind_speed)) +
+  geom_point(color = "#00467F", alpha = .7) + 
+  theme_classic()
+```
+
+#### Hours Fished  
+
+```{r warning = FALSE}
+frs_deep7_clean %>% 
+  select(tripID, Sp, number_lost_to_predator, hours) %>% 
+  ggplot(aes(x = hours, y = number_lost_to_predator)) +
+  geom_point(color = "#00467F", alpha = .7) + 
+  theme_classic() +
+  labs(y = "Number of fish lost to predators", 
+       x = "Hours fished")
+
+
+frs_deep7_clean %>% 
+  select(tripID, Sp, number_lost_to_predator, hours) %>% 
+  filter(hours < 100) %>%  #4 days
+  ggplot(aes(x = hours, y = number_lost_to_predator)) +
+  geom_point(color = "#00467F", alpha = .7) + 
+  theme_classic() +
+  labs(y = "Number of fish lost to predators", 
+       x = "Hours fished",
+       caption = "Restricted to hours < 100 or 4 days")
+
+frs_deep7_clean %>% 
+  select(tripID, Sp, number_lost_to_predator, hours) %>% 
+  filter(hours < 100) %>%  #4 days
+  ggplot(aes(x = hours, y = number_lost_to_predator, color = Sp)) +
+  geom_point(alpha = .65, show.legend = FALSE) +
+  facet_wrap(~Sp, scales = "free") +
+  theme_classic() +
+  labs(y = "Number of fish lost to predators", 
+       x = "Hours fished",
+       caption = "Restricted to hours < 100 or 4 days")
+```
+
+#### Hooks Used  
+
+```{r}
+frs_deep7_clean %>%
+  filter(!is.na(hooks)) %>% 
+  ggplot(aes(x = hooks, y = number_lost_to_predator, color = Sp)) +
+  geom_point(alpha = .7, show.legend = FALSE) +
+  facet_wrap(~Sp, scales = "free") +
+  theme_classic() +
+  scale_x_continuous("Number of Hooks", breaks = seq(1,10,by=1), labels = seq(1,10,by=1))
+```
+
+
+## Removing Some Zeros  
+
+Marc mentioned that perhaps the dataset is negatively biased because fishermen either did not start reporting right away or many just never report it. To evaluate this I took the dataset and for each license number, found the first instance of when the number_lost_to_predator was greater than 0 and then only kept the rows of data for that license after that date. Filtering the data for dates after depredation was first reported reduced the number of records from 144,064 to 85,866 and reduced the number of unique license numbers from 2,389 to 742.  
+
+```{r warning=FALSE}
+first.dep <- frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  group_by(license) %>% 
+  filter(number_lost_to_predator > 0) %>% 
+  arrange(fished) %>% 
+  slice(1) %>% 
+  select(license, fished) %>% 
+  rename(first_dep = fished) 
+
+dep.sub.sum <- frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  merge(first.dep, by = "license") %>% 
+  filter(fished >= first_dep) %>% 
+  group_by(Sp, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+          caught = sum(caught, na.rm = TRUE),
+          release = sum(release, na.rm = TRUE),
+          dep_rate = (lost/(lost+caught+release))*100) 
+  
+frs_deep7_clean %>% 
+  group_by(Sp, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            caught = sum(caught, na.rm = TRUE),
+            release = sum(release, na.rm = TRUE),
+            dep_rate = (lost/(lost+caught+release))*100) %>% 
+  ggplot(aes(x = fyear, y = dep_rate, color = Sp)) +
+  geom_line(size = 1.2, alpha = .65, show.legend = FALSE) +
+  geom_line(aes(x = fyear, y = dep_rate), data = dep.sub.sum, linetype = "dashed", size = 1, alpha = .65, show.legend = FALSE) +
+  facet_wrap(~Sp) +
+  theme_classic() +
+  labs(x = "Fishing Year",
+       y = "Depredation Rate",
+       title = "Depredation rates over time by species",
+       caption = "Solid line includes all records, dashed lines are subset.")
+
+
+original.dep.rate <- frs_deep7_clean %>% 
+  group_by(Sp) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            dep = round((lost/(catch + lost + rel))*100,2)) %>% 
+  arrange(desc(dep)) %>% 
+  select(Sp, dep)
+
+frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  merge(first.dep, by = "license") %>% 
+  filter(fished >= first_dep) %>% 
+  group_by(Sp) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            caught = sum(caught, na.rm = TRUE),
+            release = sum(release, na.rm = TRUE),
+            prop_dep = round((lost/(lost+caught+release))*100,2)) %>% 
+  merge(original.dep.rate, by = "Sp") %>% 
+  arrange(desc(prop_dep)) %>% 
+  gt() %>% 
+  cols_label(
+    Sp = "Species",
+    lost = "Number Lost",
+    caught = "Number Caught", 
+    release = "Number Released",
+    prop_dep = "Percent Lost to Predation",
+    dep = "Original Depredation Rate"
+  ) %>% 
+  tab_header(title = "Total percent of catch lost to predation by species")
+
+  
+  
+```
+
+#### By Location  
+
+```{r}
+## Opaka
+dep.sub.sum <- frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  merge(first.dep, by = "license") %>% 
+  filter(fished >= first_dep) %>% 
+  filter(str_detect(Sp, "Opakapaka")) %>% 
+  group_by(Sp, fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+          caught = sum(caught, na.rm = TRUE),
+          release = sum(release, na.rm = TRUE),
+          dep_rate = (lost/(lost+caught+release)))
+
+full_dep_means <- frs_deep7_clean %>% 
+  group_by(Sp, Island, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(full_means = mean(prop_dep))
+
+sub_dep_means <- dep.sub.sum %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(sub_means = mean(dep_rate))
+
+frs_deep7_clean %>% 
+  merge(full_dep_means, by = c("Sp", "Island")) %>%
+  merge(sub_dep_means, by = c("Sp", "Island")) %>% 
+  filter(str_detect(Sp, "Opakapaka")) %>% 
+  group_by(fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel),
+            mean_prop = mean(full_means),
+            sub_means = mean(sub_means)) %>% 
+  merge(dep.sub.sum, by = c("fyear", "Island")) %>% 
+  select(-c(lost.x, catch, rel, lost.y, caught, release, Sp)) %>% 
+  pivot_longer(cols = c("mean_prop", "sub_means"), names_to = "dataset", values_to = "means") %>% 
+  pivot_longer(cols = c("prop_dep", "dep_rate"), names_to = "timeseries", values_to = "values") %>% 
+  mutate(dataset = str_replace_all(dataset, c("mean_prop" = "Full", 
+                                     "sub_means" = "Subset")),
+         timeseries = str_replace_all(timeseries, c("dep_rate" = "Subset",
+                                                    "prop_dep" = "Full"))) %>% 
+  ggplot(aes(x = fyear, y = values, color = timeseries, linetype = timeseries)) +
+  geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+  geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+  geom_hline(aes(yintercept = means, color = dataset, linetype = dataset), size = .75) +
+  facet_wrap(~Island, scales = "free") +
+  labs(title = "Proportion of predation on Opakapaka Catches by Island", 
+       x = "Fishing Year",
+       y = "Proportion of catch lost to predator",
+       caption = "Horizontal line represents the mean proportion from 2002 to 2021. \n The full dataset includes all records from 2001 and the subset only includes those after first reported depredation.") + 
+  theme_classic()
+  
+
+
+```
+
+```{r}
+## Onaga
+dep.sub.sum <- frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  merge(first.dep, by = "license") %>% 
+  filter(fished >= first_dep) %>% 
+  filter(str_detect(Sp, "Onaga")) %>% 
+  group_by(Sp, fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+          caught = sum(caught, na.rm = TRUE),
+          release = sum(release, na.rm = TRUE),
+          dep_rate = (lost/(lost+caught+release)))
+
+full_dep_means <- frs_deep7_clean %>% 
+  group_by(Sp, Island, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(full_means = mean(prop_dep))
+
+sub_dep_means <- dep.sub.sum %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(sub_means = mean(dep_rate))
+
+frs_deep7_clean %>% 
+  merge(full_dep_means, by = c("Sp", "Island")) %>%
+  merge(sub_dep_means, by = c("Sp", "Island")) %>% 
+  filter(str_detect(Sp, "Onaga")) %>% 
+  group_by(fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel),
+            mean_prop = mean(full_means),
+            sub_means = mean(sub_means)) %>% 
+  merge(dep.sub.sum, by = c("fyear", "Island")) %>% 
+  select(-c(lost.x, catch, rel, lost.y, caught, release, Sp)) %>% 
+  pivot_longer(cols = c("mean_prop", "sub_means"), names_to = "dataset", values_to = "means") %>% 
+  pivot_longer(cols = c("prop_dep", "dep_rate"), names_to = "timeseries", values_to = "values") %>% 
+  mutate(dataset = str_replace_all(dataset, c("mean_prop" = "Full", 
+                                     "sub_means" = "Subset")),
+         timeseries = str_replace_all(timeseries, c("dep_rate" = "Subset",
+                                                    "prop_dep" = "Full"))) %>% 
+  ggplot(aes(x = fyear, y = values, color = timeseries, linetype = timeseries)) +
+  geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+  geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+  geom_hline(aes(yintercept = means, color = dataset, linetype = dataset), size = .75) +
+  facet_wrap(~Island, scales = "free") +
+  labs(title = "Proportion of predation on Onaga Catches by Island", 
+       x = "Fishing Year",
+       y = "Proportion of catch lost to predator",
+       caption = "Horizontal line represents the mean proportion from 2002 to 2021. \n The full dataset includes all records from 2001 and the subset only includes those after first reported depredation.") + 
+  theme_classic()
+  
+
+
+
+```
+
+```{r}
+## Uku
+dep.sub.sum <- frs_deep7_clean %>% 
+  separate(tripID, into = c("license", "vessel", "fished"), sep = "_") %>% 
+  merge(first.dep, by = "license") %>% 
+  filter(fished >= first_dep) %>% 
+  filter(str_detect(Sp, "Uku")) %>% 
+  group_by(Sp, fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+          caught = sum(caught, na.rm = TRUE),
+          release = sum(release, na.rm = TRUE),
+          dep_rate = (lost/(lost+caught+release)))
+
+full_dep_means <- frs_deep7_clean %>% 
+  group_by(Sp, Island, fyear) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel)) %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(full_means = mean(prop_dep))
+
+sub_dep_means <- dep.sub.sum %>% 
+  ungroup() %>% 
+  group_by(Sp, Island) %>% 
+  summarise(sub_means = mean(dep_rate))
+
+frs_deep7_clean %>% 
+  merge(full_dep_means, by = c("Sp", "Island")) %>%
+  merge(sub_dep_means, by = c("Sp", "Island")) %>% 
+  filter(str_detect(Sp, "Uku")) %>% 
+  group_by(fyear, Island) %>% 
+  summarise(lost = sum(number_lost_to_predator, na.rm = TRUE),
+            catch = sum(caught, na.rm = TRUE),
+            rel = sum(release, na.rm = TRUE),
+            prop_dep = lost/(catch + lost + rel),
+            mean_prop = mean(full_means),
+            sub_means = mean(sub_means)) %>% 
+  merge(dep.sub.sum, by = c("fyear", "Island")) %>% 
+  select(-c(lost.x, catch, rel, lost.y, caught, release, Sp)) %>% 
+  pivot_longer(cols = c("mean_prop", "sub_means"), names_to = "dataset", values_to = "means") %>% 
+  pivot_longer(cols = c("prop_dep", "dep_rate"), names_to = "timeseries", values_to = "values") %>% 
+  mutate(dataset = str_replace_all(dataset, c("mean_prop" = "Full", 
+                                     "sub_means" = "Subset")),
+         timeseries = str_replace_all(timeseries, c("dep_rate" = "Subset",
+                                                    "prop_dep" = "Full"))) %>% 
+  ggplot(aes(x = fyear, y = values, color = timeseries, linetype = timeseries)) +
+  geom_point(size = 1.25, alpha = .65, show.legend = FALSE) +
+  geom_line(size = 1, alpha = .65, show.legend = FALSE) +
+  geom_hline(aes(yintercept = means, color = dataset, linetype = dataset), size = .75) +
+  facet_wrap(~Island, scales = "free") +
+  labs(title = "Proportion of predation on Uku Catches by Island", 
+       x = "Fishing Year",
+       y = "Proportion of catch lost to predator",
+       caption = "Horizontal line represents the mean proportion from 2002 to 2021. \n The full dataset includes all records from 2001 and the subset only includes those after first reported depredation.") + 
+  theme_classic()
+  
+
+
+```

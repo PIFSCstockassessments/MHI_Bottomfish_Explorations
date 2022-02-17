@@ -1,0 +1,429 @@
+---
+title: "BFISH_Deep_7_Length_Comps"
+author: "Meg Oshima"
+date: "6/21/2021"
+output:  
+  html_document:
+    toc: true
+    toc_float: true
+    toc_levels: 2
+ 
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(magrittr)
+library(gt)
+library(rgdal)
+library(sf)
+library(nmfspalette)
+
+knitr::opts_chunk$set(warning=FALSE,
+                message=FALSE,
+                echo=FALSE)  
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+
+```
+
+### Camera Survey
+```{r}
+
+camera_lengths <- read.csv("../Data/BFISH 2016-2019 Camera Lengths.csv")
+fishing_lengths <- read.csv("../Data/BFISH 2016-2019 Research Fishing Lengths.csv")
+PSU <- read.csv("../Data/BFISH PSU lookup table.csv")
+psu <- st_read("../Data/GIS/Shapefiles/BFISH_PSU.shp")
+### HI shapefile, unadjusted coordinates
+HI <- st_read("../Data/GIS/Shapefiles/cb_2017_us_state_20m.shp")
+
+deep_6 <- unique(camera_lengths$COMMON_NAME)[-c(8:9)]
+
+deep_6_sps <- camera_lengths %>% 
+  filter(COMMON_NAME %in% deep_6) %>% 
+  distinct(SPECIES_CD, .keep_all = TRUE) %>% 
+  select(SPECIES_CD, SCIENTIFIC_NAME, COMMON_NAME)
+
+cam_6 <- camera_lengths %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  filter(COMMON_NAME %in% deep_6) %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  rename(SAMPLE_ID = "DROP_CD",
+         DEPTH = OFFICIAL_DEPTH_M) %>% 
+  select(PSU, 
+         SAMPLE_ID, 
+         Year, 
+         SPECIES_CD, 
+         COMMON_NAME, 
+         DEPTH, 
+         LENGTH_CM, 
+         Island) %>% 
+  mutate(Gear = "Camera")
+
+PSU %<>% 
+  select(-c(Island, 
+            Lat_DD_MM, 
+            Long_DD_MM, 
+            Lat_DD_MM_SS, 
+            Long_DD_MM_SS, 
+            STRATA_2020, 
+            Depth_MEAN_m, 
+            Depth_MIN_m, 
+            Depth_MAX_m, 
+            Depth_STD_m, 
+            med_slp, 
+            med_acr, 
+            Depth_px_n, 
+            Slp_px_n, 
+            BS_px_nj, 
+            BS_px_over_136j,
+            BS_pct_over_136j, 
+            pctHB, 
+            pctHS))
+
+
+cam_6 <- merge(cam_6, PSU, by = "PSU")
+
+fish_6 <- fishing_lengths %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  filter(COMMON_NAME %in% deep_6) %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  rename(DEPTH = SAMPLE_MEAN_DEPTH_M) %>% 
+  select(PSU, 
+         SAMPLE_ID,
+         Year, 
+         SPECIES_CD, 
+         COMMON_NAME, 
+         DEPTH, 
+         LENGTH_CM, 
+         Island) %>% 
+  mutate(Gear = "Research Fishing")
+
+fish_6 <- merge(fish_6, PSU, by = "PSU")
+
+```
+
+```{r}
+
+cam_6 %>% 
+  group_by(COMMON_NAME) %>% 
+  summarise(N = n(), 
+            MEAN_LENGTH = mean(LENGTH_CM),
+            CV = sd(LENGTH_CM)/mean(LENGTH_CM)) %>% 
+  arrange(by_group = FALSE, desc(N)) %>% 
+  gt() %>% 
+  fmt_number(columns = c("MEAN_LENGTH", "CV"), decimals = 2) %>% 
+  tab_header(title = "Mean Length and Sample Size of Each Species")
+```
+
+<br>  
+
+```{r}
+cam_6 %>% 
+  ggplot(aes(x = LENGTH_CM)) +
+  geom_density() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+  labs(title = "Camera Length Distributions for Deep 7 Species")
+
+```
+
+<br>  
+
+#### Length Distributions by Year
+```{r}
+cam_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = Year)) +
+  geom_density() + 
+  #geom_density(data = cam_6, aes(x = LENGTH_CM), color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() 
+```
+
+<br>
+
+
+```{r}
+cam_6 %>% 
+  group_by(COMMON_NAME, Year) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Year") 
+
+
+```
+
+<br>  
+
+#### Length Distributions by Island
+```{r}
+cam_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = Island)) +
+  geom_density() +
+  #geom_density(data = cam_6, aes(x = LENGTH_CM), color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() 
+```
+
+
+<br>  
+
+```{r}
+cam_6 %>% 
+  group_by(COMMON_NAME, Island) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Island")
+```
+
+<br>  
+
+#### Length Distributions by Strata   
+_Strata types are coded as hardness (HB = Hardbottom, SB = Softbottom), slope (H = High, L = Low, A = All), and depth (S = Shallow (75-200m), M = Medium (200-300m), D = Deep (300-400m))._
+```{r}
+cam_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = STRATA)) +
+  geom_density() +
+ # geom_density(data = cam_6, aes(x = LENGTH_CM), color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() 
+```
+
+
+<br>  
+
+```{r}
+cam_6 %>% 
+  group_by(COMMON_NAME, STRATA) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Strata")
+```
+
+
+<br><br>  
+
+
+
+
+### Research Fishing
+
+```{r}
+fish_6 %>% 
+  group_by(COMMON_NAME) %>% 
+  summarise(N = n(), 
+            MEAN_LENGTH = mean(LENGTH_CM, na.rm = TRUE),
+            CV = sd(LENGTH_CM, na.rm = TRUE)/mean(LENGTH_CM, na.rm = TRUE)) %>% 
+  arrange(by_group = FALSE, desc(N)) %>% 
+  gt() %>% 
+  fmt_number(columns = c("MEAN_LENGTH", "CV"), decimals = 2) %>% 
+  tab_header(title = "Mean Length and Sample Size of Each Species")
+```
+
+<br>  
+
+```{r}
+fish_6 %>% 
+  ggplot(aes(x = LENGTH_CM)) +
+  geom_density() +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic() +
+  labs(title = "Research Fishing Length Distributions for Deep 7 Species")
+
+```
+
+<br>  
+
+#### Length Distributions by Year
+```{r}
+
+fish_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = Year)) +
+  geom_density() +
+  #geom_density(data = fish_6, aes(x = LENGTH_CM),  color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic()
+
+
+
+```
+
+<br>  
+
+
+```{r}
+fish_6 %>% 
+  group_by(COMMON_NAME, Year) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Year")
+```
+
+<br>  
+
+#### Length Distributions by Island
+```{r}
+
+fish_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = Island)) +
+  geom_density() +
+  #geom_density(data = fish_6, aes(x = LENGTH_CM), color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic()
+
+
+
+```
+
+<br>  
+
+```{r}
+fish_6 %>% 
+  group_by(COMMON_NAME, Island) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Island")
+```
+<br>  
+
+#### Length Distributions by Strata
+```{r}
+
+fish_6 %>% 
+  ggplot(aes(x = LENGTH_CM, color = STRATA)) +
+  geom_density() +
+  #geom_density(data = fish_6, aes(x = LENGTH_CM), color = "grey60", size = 1.2) +
+  facet_wrap(~COMMON_NAME, scales = "free") +
+  theme_classic()
+
+
+
+```
+
+<br>  
+
+```{r}
+fish_6 %>% 
+  group_by(COMMON_NAME, STRATA) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = COMMON_NAME, values_from = N, values_fill = 0) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Individuals Caught per Strata")
+```
+
+<br><br>  
+
+
+### Camera vs Research  
+
+##### Length Distributions  
+```{r}
+deep_6_df <- cam_6 %>% 
+  bind_rows(fish_6)
+
+deep_6_df %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~COMMON_NAME) +
+  theme_classic()
+
+```
+
+#### Ehu 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Ehu") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+#### Gindai 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Gindai") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+#### Hapuupuu 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Hapuupuu") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+#### Kalekale 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Kalekale") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+#### Lehi 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Lehi") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+
+#### Onaga
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Onaga") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```
+
+
+#### Opakapaka 
+```{r}
+deep_6_df %>% 
+  filter(COMMON_NAME == "Opakapaka") %>% 
+  group_by(STRATA, Gear) %>% 
+  filter(n() > 1) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Gear)) +
+  geom_density() +
+  facet_wrap(~STRATA, scales = "free") +
+  theme_classic()
+```

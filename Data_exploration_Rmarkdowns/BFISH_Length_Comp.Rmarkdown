@@ -1,0 +1,948 @@
+---
+title: "Opaka Length Comp Investigations"
+author: "Meg Oshima"
+date: "5/21/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_levels: 2
+
+
+---
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(r4ss)
+library(magrittr)
+library(gt)
+library(rgdal)
+library(sf)
+library(nmfspalette)
+
+knitr::opts_chunk$set(warning=FALSE,
+                message=FALSE,
+                echo=FALSE)  
+
+scale_colour_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_colour_discrete   <- function(...) scale_color_nmfs(palette = "regional web")
+scale_fill_continuous <- function(...) scale_fill_nmfs(palette = "regional web")
+scale_fill_binned <- function(...) scale_color_nmfs(palette = "regional web")
+```
+
+
+```{r }
+#rmarkdown::github_document
+
+camera_lengths <- read.csv("../Data/BFISH 2016-2019 Camera Lengths.csv")
+fishing_lengths <- read.csv("../Data/BFISH 2016-2019 Research Fishing Lengths.csv")
+PSU <- read.csv("../Data/BFISH PSU lookup table.csv")
+psu <- st_read("../Data/GIS/Shapefiles/BFISH_PSU.shp")
+### HI shapefile, unadjusted coordinates
+HI <- st_read("../Data/GIS/Shapefiles/cb_2017_us_state_20m.shp")
+sp_code <- "PRFI"
+```
+
+## Camera Lengths {#cameralengths}
+```{r}
+cam <- camera_lengths %>% 
+filter(str_detect(SPECIES_CD, sp_code)) %>% 
+filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+select(-X)
+
+PSU %<>% 
+  select(-c(Island, 
+            Lat_DD_MM, 
+            Long_DD_MM, 
+            Lat_DD_MM_SS, 
+            Long_DD_MM_SS, 
+            STRATA_2020, 
+            Depth_MEAN_m, 
+            Depth_MIN_m, 
+            Depth_MAX_m, 
+            Depth_STD_m, 
+            med_slp, 
+            med_acr, 
+            Depth_px_n, 
+            Slp_px_n, 
+            BS_px_nj, 
+            BS_px_over_136j,
+            BS_pct_over_136j, 
+            pctHB, 
+            pctHS))
+
+
+cam <- merge(cam, PSU, by = "PSU")
+summary(camera_lengths)
+
+```
+
+
+```{r}
+
+fish <- fishing_lengths %>% 
+  filter(str_detect(SPECIES_CD, sp_code)) %>% 
+  filter(str_detect(BFISH, "_S", negate = TRUE)) %>% 
+  select(-X) %>% 
+  filter(SAMPLE_MEAN_DEPTH_M >= 75 & SAMPLE_MEAN_DEPTH_M <= 250)
+fish <- merge(fish, PSU, by = "PSU")
+
+cam %>% 
+ggplot(aes(x = LENGTH_CM)) +
+geom_density() +
+geom_vline(aes(xintercept=13.5),
+            color="red", linetype="dashed", size=1) +
+geom_vline(aes(xintercept = 54.5),
+            color="blue", linetype="dashed", size=1) +
+geom_density(aes(x = LENGTH_CM), data = fish, color = "gray60") +
+  theme_classic() +
+  labs(caption = "Black line represents camera lengths and the gray line represents research fishing lengths.")
+```
+
+#### What is causing the mode in the smaller size classes in the BFISH camera data?  
+
+  *   Which sites are most of these samples coming from?
+  *   Which islands are these samples from?  
+  *   What depth are these samples from?  
+  *   Which strata(s) are these samples from?
+
+```{r}
+cam %>% 
+filter(LENGTH_CM < 20) %>% 
+ggplot(aes(x = LENGTH_CM)) +
+geom_density() +
+  theme_classic()
+```
+
+```{r fig.cap= "The number of Opaka between 10 and 15 cm that were caught at sites with at least one fish in that size bin."}
+cam %>% 
+filter(LENGTH_CM > 10 & LENGTH_CM < 15) %>% 
+group_by(DROP_CD) %>% 
+summarise(n = n()) %>% 
+#filter(n > 1) %>% 
+ggplot(aes(x = DROP_CD, y = n)) + 
+geom_point() +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) +
+  theme_classic()
+```
+
+
+```{r}
+
+#looking for sizes between 10 and 15 cm
+small_mode_drops <- cam %>% 
+filter(LENGTH_CM < 15 & LENGTH_CM > 10) %>% 
+group_by(DROP_CD) %>% 
+summarise(n = n()) %>% 
+filter(n >= 5) %>% 
+pull(DROP_CD)
+
+
+cam %>% 
+filter(str_detect(DROP_CD, paste0(small_mode_drops, collapse = "|"))) %>% 
+filter(LENGTH_CM < 15 & LENGTH_CM > 10) %>% 
+group_by(DROP_CD, STRATA) %>% 
+summarise(n = n()) %>% 
+  ungroup() %>% 
+  arrange(desc(n)) %>% 
+  gt() %>% 
+  tab_header(title = "Sites that caught 5 or more Opaka between 10 and 15 cm")
+
+```
+_Strata types are coded as hardness (HB = Hardbottom, SB = Softbottom), slope (H = High, L = Low, A = All), and depth (S = Shallow (75-200m), M = Medium (200-300m), D = Deep (300-400m))._
+
+<br>  
+
+```{r fig.cap="6 camera drops had 5 or more fish between 10 - 15 cm. The samples came from Oahu and all were caught between 100 - 110 m deep (which is the first quantile of depths sampled). The three strata types are Hardbottom-high slope-shallow, Hardbottom-low slope-shallow, and Softbottom-all slopes-shallow."}
+cam %>% 
+filter(str_detect(DROP_CD, paste0(small_mode_drops, collapse = "|")))  %>% 
+ggplot(aes(x = LENGTH_CM, y = OFFICIAL_DEPTH_M)) + 
+geom_point(aes(colour = STRATA), size = 3.5, alpha = .5) +
+scale_y_reverse() +
+theme_classic()
+
+```
+
+<br>  
+
+
+#### What is causing the mode in the larger size classes in the BFISH camera data?  
+
+  *   Which sites are most of these samples coming from?
+  *   Which islands are these samples from?  
+  *   What depth are these samples from?  
+  *   Which strata(s) are these samples from?   
+
+```{r }
+cam %>% 
+filter(LENGTH_CM > 50 & LENGTH_CM < 60) %>% 
+ggplot(aes(x = LENGTH_CM)) +
+geom_density() +
+  theme_classic()
+```
+
+```{r fig.cap="The number of Opaka between 50 and 60 cm caught at sites with more than n = 2 fish of that size."}
+cam %>% 
+filter(LENGTH_CM > 50 & LENGTH_CM < 60) %>% 
+group_by(DROP_CD) %>% 
+summarise(n = n()) %>% 
+filter(n > 2) %>% 
+ggplot(aes(x = DROP_CD, y = n)) + 
+  geom_point() +
+  scale_x_discrete(guide = guide_axis(n.dodge=3)) +
+  theme_classic()
+
+large_mode_drops <- cam %>%
+filter(LENGTH_CM > 50 & LENGTH_CM < 60) %>%
+group_by(DROP_CD) %>%
+summarise(n = n()) %>%
+filter(n > 5)%>%
+pull(DROP_CD)
+
+```
+
+
+```{r}
+cam %>% 
+  filter(LENGTH_CM > 50 & LENGTH_CM < 60) %>% 
+  group_by(DROP_CD, STRATA) %>% 
+  summarise(n = n()) %>% 
+  ungroup() %>% 
+  filter(n > 5) %>% 
+  arrange(desc(n)) %>% 
+  gt() %>% 
+  tab_header(title = "Sites that caught more than 5 fish between 50 and 60 cm")
+
+```
+<br>  
+
+```{r fig.cap= "5 camera drops had more than 5 fish between 50 and 60 cm. The samples came from the Big Island (n = 1), Kauai (n = 1), Maui Nui (n = 2), and Oahu (n =1) were caught at depths of 150 to 210 m. Three samples were in a hardbottom, high-slope, shallow strata and two samples were in a hardbottom, high-slope, medium depth strata. The two highest catches occurred in 2019, and all occurred in 2019 or 2017."}
+cam %>% 
+filter(str_detect(DROP_CD, paste0(large_mode_drops, collapse = "|")))  %>% 
+ggplot(aes(x = LENGTH_CM, y = OFFICIAL_DEPTH_M)) + 
+geom_point(aes(colour = STRATA, shape = Island), size = 3.5, alpha = .5) +
+scale_y_reverse() +
+theme_classic()
+
+```
+
+## Fishing Lengths {#fishinglengths}
+```{r}
+summary(fish)
+```
+
+
+```{r}
+
+small_mode_fish <- fish %>% 
+filter(LENGTH_CM > 20 & LENGTH_CM < 25)  %>% 
+group_by(SAMPLE_ID) %>% 
+summarise(n = n()) %>% 
+filter(n > 1) %>% 
+pull(SAMPLE_ID)
+
+fish %>% 
+filter(LENGTH_CM > 20 & LENGTH_CM < 25)  %>% 
+group_by(SAMPLE_ID, STRATA) %>% 
+summarise(n = n()) %>% 
+  ungroup() %>% 
+filter(n > 1) %>% 
+  arrange(desc(n)) %>% 
+  gt() %>% 
+  tab_header(title = "Fishing events where more than 1 Opaka between 20 and 25 cm were caught")
+```
+
+```{r fig.cap= "4 fishing events had more than 1 fish between 20 and 25 cm. The samples came from Oahu (n = 2) and Maui Nui (n = 2) and were caught at depths 89 to 142 m. All three were from a hardbottom, high-slope, shallow site. The catches occurred in 2017 (n = 3) and 2019 (n = 1)."}
+fish %>% 
+filter(str_detect(SAMPLE_ID, paste0(small_mode_fish, collapse = "|")))  %>% 
+filter(LENGTH_CM > 20 & LENGTH_CM < 25) %>% 
+ggplot(aes(x = LENGTH_CM, y = SAMPLE_MEAN_DEPTH_M)) + 
+geom_point(aes(colour = Island), size = 3.5, alpha = .5) +
+scale_y_reverse() +
+theme_classic()
+```
+
+
+## Camera Lengths by Year, Strata, and Island  
+
+:::: {style="display: flex;"}
+
+::: {}
+
+*   4 Years 
+      *   2016
+      *   2017
+      *   2018  
+      *   2019
+      
+*   5 Islands 
+      *   Big Island  
+      *   Maui Nui  
+      *   Oahu  
+      *   Ni'ihau
+      *   Kauai 
+:::
+
+:::{}
+
+
+
+:::
+
+::: {}
+*   10 strata  
+      *   HB_H_D 
+      *   HB_H_M
+      *   HB_H_S
+      *   HB_L_S
+      *   SB_A_S
+      *   HB_L_D
+      *   SB_A_D
+      *   HB_L_M
+      *   SB_A_M
+      *   SB_H_S
+:::
+
+::::
+
+
+
+```{r }
+
+### number of samples per year
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  distinct(DROP_CD) %>% 
+  summarise(n = n()) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Camera Drops per Year")
+
+
+```
+
+#### Density Plot by Year
+```{r }
+### density plot by year, overlaid on top of each other to see if some years are more similar than others
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, group = Year, colour = Year)) +
+  geom_density(size = .75) +
+  theme_classic()
+
+```
+
+  *   All years have a bimodal (or tri) distribution, but small modes differ.  
+  *   2019 has three modes, with middle one being the smallest.  
+  *   2017 and 2018 are very similar to each other and 2016 is the most distinct from the other years.  
+
+
+
+```{r }
+
+### number of samples per strata
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(STRATA) %>% 
+  #distinct(DROP_CD) %>% 
+  summarise(n = n_distinct(DROP_CD),
+            Mean_Len = paste0(round(mean(LENGTH_CM), 2), " (", round(sd(LENGTH_CM),2), ")"),
+            Median_Len = median(LENGTH_CM)) %>% 
+  arrange(desc(n)) %>% 
+  gt() %>% 
+  fmt_number(columns = c("Median_Len"), decimals = 2) %>% 
+  tab_header(title = "Summary of Camera Drops per Strata") %>% 
+  cols_label(
+    STRATA = "Strata",
+    n = "N",
+    Mean_Len = "Mean Length (SD)",
+    Median_Len = "Median Length"
+  )
+
+
+
+```
+
+
+```{r}
+
+psu.cam <- cam %>% 
+  select(PSU) %>% 
+  distinct(PSU) %>% 
+  pull(PSU)
+
+psu.fish <- fish %>% 
+  dplyr::select(PSU) %>% 
+  distinct(PSU) %>% 
+  pull(PSU)
+
+psu.sampled <- psu %>% 
+  filter(PSU %in% psu.cam) %>% 
+  mutate(Gear = "Camera") %>% 
+  dplyr::select(lon_deg, lat_deg, PSU, Gear) %>% 
+  st_set_geometry(NULL)
+
+fish.sampled <- psu %>% 
+  filter(PSU %in% psu.fish) %>% 
+  mutate(Gear = "Research Fishing") %>% 
+  dplyr::select(lon_deg, lat_deg, PSU, Gear) %>% 
+  st_set_geometry(NULL)
+
+psu.sampled <- psu.sampled %>% 
+  bind_rows(fish.sampled)
+
+## map with dots size = n of sampling in that location
+cam.n <- cam %>% 
+  group_by(PSU) %>% 
+  summarise(n = n()) %>% 
+  merge(psu, by = "PSU") %>% 
+  mutate(Gear = "Camera")
+
+  
+fish.n <- fish %>% 
+  group_by(PSU) %>% 
+  summarise(n = n()) %>% 
+  merge(psu, by = "PSU") %>% 
+  mutate(Gear = "Research Fishing")
+
+N.drops <- bind_rows(fish.n, cam.n)
+islands <- data.frame(Island = c("Big Island", "Maui Nui", "Oahu", "Kauai", "Niihau"), lat_deg = c(19.6, 20.8, 21.45, 22.1, 21.9), lon_deg = c(-155.45, -156.25, -157.96, -159.52, -160.35))
+
+
+HI %>% 
+  filter(STATEFP == 15) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = N.drops, aes(x = lon_deg, y = lat_deg, colour = STRATA), size = 2, alpha = .5) +
+  geom_text(data = islands, aes(lon_deg, lat_deg, label = Island), size = 3.5) +
+  theme_classic() +
+  labs(y = "Latitude", x = "Longitude", title = "Strata types sampled by camera and/or research fishing")
+
+```
+
+#### Density Plot by Strata
+
+```{r fig.cap="Softbottom sites have only small Opaka (approx. < 20 cm) and the hardbottom, medium depth sites have mostly larger Opaka (> 45cm)."}
+### density plot by year, overlaid on top of each other to see if some years are more similar than others
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(STRATA) %>% 
+  ggplot(aes(x = LENGTH_CM, group = STRATA, colour = STRATA)) +
+  geom_density(size = .75) +
+  theme_classic() 
+
+
+```
+<br>    
+Based on this figure, it seems that depth is the common factor for small Opaka; they were never found in the medium depth strata, only the shallow depths. However, smaller amounts of large Opaka (~55 cm) were found in shallow strata as well so those strata are not exclusively small Opaka. The slope and bottom-hardness varied (low, high, and all, and soft and hard). Softbottom strata had relatively much more smaller (< 20cm) Opaka (n = 27 out of 29 [93%]) than the hardbottom strata (n = 6 out of 29 [20.7%] and n = 81 out of 394 [20.6%] respectively).
+
+<br>  
+
+```{r }
+### number of samples per island
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Island) %>% 
+  distinct(DROP_CD) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Camera Drops per Island")
+```
+
+
+#### Density Plot by Island
+```{r}
+### density plot by island, overlaid on top of each other
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Island) %>% 
+  ggplot(aes(x = LENGTH_CM, group = Island, colour = Island)) +
+  geom_density(size = .75) +
+  theme_classic()
+
+```
+
+  *   Big Island and Oahu have more smaller fish and less bigger fish than the other islands.  
+  *   Niihau only had larger fish.  
+  *   Kauai had an almost even split between smaller and larger fish (with bigger small fish so less of a difference between modes).  
+
+### Strata-Year Interactions  
+  
+```{r}
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  distinct(DROP_CD, .keep_all = TRUE) %>% 
+  group_by(Year, STRATA) %>% 
+  ggplot(aes(x = Year, fill = STRATA)) +
+  geom_histogram(alpha = .4, stat = "count", position = "dodge") +
+  geom_text(stat='count', aes(label=..count..), position = position_dodge(width = .9), size=4) +
+  theme_classic() +
+  labs(title = "Strata Sampling by Year") +
+  scale_fill_nmfs(palette = "regional web")
+```
+
+Softbottom areas were only sampled in 2017 (n = 2) and 2018 (n = 4). High-sloped, shallow, hardbottom areas were most frequently sampled strata type, followed by high-sloped, mid-depth, hardbottom areas.
+
+```{r }
+### number of samples per island/year
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year, STRATA) %>% 
+  ggplot(aes(x = STRATA, fill = Year)) +
+  geom_histogram(alpha = .4, stat = "count", position = "dodge") +
+  geom_text(stat='count', aes(label=..count..), position = position_dodge(width = .9), size=4) +
+  theme_classic() +
+  labs(title = "Number of Fish per Strata-Year") +
+  scale_fill_nmfs(palette = "regional web")
+   
+```
+
+
+
+
+#### Density Plot by Strata and Year  
+```{r}
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Year)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  facet_wrap(~STRATA, scales = "free")
+```
+
+  *   Density plot for HB_H_S looks very similar to the length frequencies by year figure    
+  *   SB_A_S had small fish (mode ~12 and ~18 cm) in 2017 and 2018   
+  *   In 2017, 6 Opaka were caught at HB_L_S that were between 10 - 12 cm. They were all from the same PSU    
+  
+
+```{r }
+### number of samples per island/year
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year, Island) %>% 
+  ggplot(aes(x = Year, fill = Island)) +
+  geom_histogram(alpha = .4, stat = "count", position = "dodge") +
+  geom_text(stat='count', aes(label=..count..), position = position_dodge(width = .9), size=4) +
+  theme_classic() +
+  labs(title = "Number of Fish per Island-Year") +
+  scale_fill_nmfs(palette = "regional web")
+   
+```
+
+
+#### Density Plot by Island and Year  
+```{r}
+
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Year)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  facet_wrap(~Island)
+```
+
+  *   In the Big Island, catches were pretty consistent between 2017-2019 but 2016 was very different, probably because n = 3. Also, depth was more in the mid-range of sampled depths. They did not sample in the shallower range, unlike other years.  
+  *   Kauai only had 2 years of data (2016 n = 24, and 2019 n = 15) and the distributions were different, 2016 had mostly smaller fish whereas 2019 had more larger fish.  
+  *   Maui Nui catches all had the same mode for larger sizes (between 40 - 70 cm) but the modes for the smaller sized fish fluctuated each year.  
+  *   Niihau had very small sample sizes (n = 2 - 5) for the 3 years sampling occurred there so distributions are not that reliable but size range is fairly consistent. Also, the distributions are consistent with the 2019 lengths in Kauai (support for combining those regions?).   
+  *   Oahu had consistent length distributions for 2017 and 2018 but 2019 was almost exclusively small fish (< 20 cm, n = 67)
+
+
+#### Density Plot by Year and Island
+```{r}
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Island)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  facet_wrap(~Year)
+
+
+```
+
+  *   In 2016, Big Island (n = 3) and Kauai (n = 24) were similar and Niiahu (n = 2) and Maui Nui (n = 10) were similar.  
+  *   In 2017, mostly smaller fish caught off Big Island compared to the other islands. 
+  *   In 2018, there is a bimodal distribution for Maui Nui and less pronouced for the Big Island. Oahu has only larger fish (> 40 cm).  
+  *   In 2019, the first mode is almost exclusively from Oahu samples, the second mode is from Big Island and Maui Nui samples, and the third mode is from all islands.
+  
+  
+### Strata-Island Interactions  
+```{r}
+cam %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = STRATA)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  facet_wrap(~Island)
+
+
+```
+
+```{r}
+
+
+HI %>% 
+  filter(STATEFP == 15) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = cam.n, aes(x = lon_deg, y = lat_deg, colour = STRATA, size = n), alpha = .5) +
+  geom_text(data = islands, aes(lon_deg, lat_deg, label = Island), size = 3.5) + 
+  theme_classic() +
+  labs(y = "Latitude", x = "Longitude") +
+  scale_color_nmfs(palette = "regional web")
+
+
+```
+
+
+## Fishing Lengths by Year, Strata, and Island  
+
+
+```{r}
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  distinct(SAMPLE_ID) %>% 
+  summarise(n = n()) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Fishing Events per Year")
+
+```
+
+#### Density Plot by Year  
+```{r }
+### density plot by year, overlaid on top of each other to see if some years are more similar than others
+
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, group = Year, colour = Year)) +
+  geom_density(size = .75) +
+  theme_classic()
+
+```
+  
+```{r}
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(STRATA) %>% 
+  distinct(SAMPLE_ID) %>% 
+  summarise(n = n()) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Fishing Events per Strata")
+
+```
+
+#### Density Plot by Strata  
+```{r }
+### density plot by year, overlaid on top of each other to see if some years are more similar than others
+
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, group = STRATA, colour = STRATA)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  labs(caption = "Note only one sampling event occurred at HB_L_M and HB_L_S.")
+
+```
+  
+```{r}
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Island) %>% 
+  distinct(SAMPLE_ID) %>% 
+  summarise(n = n()) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Fishing Events per Island")
+
+```
+
+
+#### Density Plot by Island  
+```{r }
+### density plot by year, overlaid on top of each other to see if some years are more similar than others
+
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Island) %>% 
+  ggplot(aes(x = LENGTH_CM, group = Island, colour = Island)) +
+  geom_density(size = .75) +
+  theme_classic()
+
+```
+
+
+#### Number of Fish per Strata-Year  
+```{r }
+### number of samples per island/year
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year, STRATA) %>% 
+  ggplot(aes(x = Year, fill = STRATA)) +
+  geom_histogram(alpha = .4, stat = "count", position = "dodge") +
+  geom_text(stat='count', aes(label=..count..), position = position_dodge(width = .9), size=4) +
+  theme_classic() +
+  scale_fill_nmfs(palette = "regional web")
+   
+```
+
+
+
+#### Number of Fish per Island-Year  
+```{r }
+### number of samples per island/year
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year, Island) %>% 
+  ggplot(aes(x = Year, fill = Island)) +
+  geom_histogram(alpha = .4, stat = "count", position = "dodge") +
+  geom_text(stat='count', aes(label=..count..), position = position_dodge(width = .9), size=4) +
+  theme_classic() +
+  scale_fill_nmfs(palette = "regional web")
+   
+```
+
+#### Density Plot by Island and Year   
+```{r}
+
+fish %>% 
+  separate(BFISH, into = c("BFISH", "Year", "Seas"), sep = "_") %>% 
+  select(-c(BFISH, Seas)) %>% 
+  mutate(Island = factor(Island)) %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = LENGTH_CM, colour = Year)) +
+  geom_density(size = .75) +
+  theme_classic() +
+  facet_wrap(~Island, scale = "free")
+```
+
+  *   Big Island only had 4 fish in 2017, that's why there is a big spike. They were all about the same size.  
+  *   Kauai only had 2 fish in 2016 and 1 in 2019.  
+  *   2019 looks pretty different from the other 3 in Maui Nui (the mode is larger than other years).  
+  *   Niihau only had 3 fish in 2018 (should we exclude since it doesn't match up with the other samples?)  
+  *   Oahu has pretty low sample sizes but tends to be smaller fish than the other islands
+
+### Strata-Island Interactions  
+
+```{r}
+
+
+HI %>% 
+  filter(STATEFP == 15) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = fish.n, aes(x = lon_deg, y = lat_deg, colour = STRATA, size = n), alpha = .5) +
+  geom_text(data = islands, aes(lon_deg, lat_deg, label = Island), size = 3.5) + 
+  theme_classic() +
+  labs(y = "Latitude", x = "Longitude") +
+  scale_color_nmfs(palette = "regional web")
+
+
+```
+
+
+## Camera vs Research Fishing  
+
+
+#### Areas sampled by camera and research fishing
+```{r }
+HI %>% 
+  filter(STATEFP == 15) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = N.drops, aes(x = lon_deg, y = lat_deg, colour = Gear, size = n), alpha = .5) +
+  geom_text(data = islands, aes(lon_deg, lat_deg, label = Island), size = 3.5) + 
+  theme_classic() +
+  labs(y = "Latitude", x = "Longitude")
+
+
+
+```
+
+#### Depths Sampled by Gear
+```{r fig.cap="Median depth for each PSU was chosen to represent the overall depth of PSU to follow the strata determination methodology."}
+
+cam.merge <- cam %>% 
+  select(PSU, DROP_CD, SPECIES_CD, OFFICIAL_DEPTH_M, Depth_MEDIAN_m, LENGTH_CM, Island, STRATA) %>% 
+  rename(MEAN_DEPTH = "OFFICIAL_DEPTH_M",
+         SAMPLE_ID = "DROP_CD") %>% 
+  mutate(Year = str_sub(SAMPLE_ID, 1, 4),
+         Month = str_sub(SAMPLE_ID, 5,6),
+         Day = str_sub(SAMPLE_ID, 7,8),
+         Gear = "Camera") 
+
+fish.merge <- fish %>% 
+  select(PSU, SAMPLE_ID, SPECIES_CD, SAMPLE_MEAN_DEPTH_M, Depth_MEDIAN_m, LENGTH_CM, Island, STRATA) %>% 
+  rename(MEAN_DEPTH = "SAMPLE_MEAN_DEPTH_M") %>% 
+  mutate(Year = str_sub(SAMPLE_ID, 1, 4),
+    Month = str_sub(SAMPLE_ID, 5, 6),
+    Day = str_sub(SAMPLE_ID, 7, 8),
+    Gear = "Research Fishing") 
+
+lengths.combo <- bind_rows(cam.merge, fish.merge)
+
+lengths.combo %>% 
+  group_by(Gear, Island, Year) %>%
+  ggplot(aes(x = Year, y = Depth_MEDIAN_m, fill = Gear)) +
+  geom_boxplot(alpha = .4) +
+  facet_wrap(~Island, scales = "free") +
+  scale_y_reverse() +
+  theme_classic() +
+  labs(y = "Depth (m)") +
+  scale_fill_nmfs(palette = "regional web") 
+```
+
+
+
+#### Length Composition Comparisons by Year
+```{r}
+
+lengths.combo %>% 
+  mutate(SAMPLE_ID = factor(SAMPLE_ID)) %>% 
+  distinct(SAMPLE_ID, .keep_all = TRUE) %>% 
+  group_by(Gear, Year) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = Gear, values_from = N) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Sampling Events by Year")
+
+
+lengths.combo %>% 
+  ggplot(aes(x = LENGTH_CM)) +
+  geom_density(aes(colour = Gear), size = .75) +
+  facet_wrap(~Year) +
+  theme_classic() +
+  labs(title = "Length Distributions by Year")
+  
+```
+
+ 
+#### Length Composition Comparisons by Strata  
+```{r }
+lengths.combo %>% 
+  mutate(SAMPLE_ID = factor(SAMPLE_ID)) %>% 
+  distinct(SAMPLE_ID, .keep_all = TRUE) %>% 
+  group_by(Gear, STRATA) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = Gear, values_from = N) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Sampling Events by Strata")
+
+lengths.combo %>% 
+  ggplot(aes(LENGTH_CM)) +
+  geom_density(aes(colour = Gear), size = .75) + 
+  facet_wrap(~STRATA) +
+  theme_classic() +
+  labs(title = "Length Distributions by Strata")
+
+```
+
+
+
+ 
+#### Length Composition Comparisons by Island  
+```{r }
+lengths.combo %>% 
+  mutate(SAMPLE_ID = factor(SAMPLE_ID)) %>% 
+  distinct(SAMPLE_ID, .keep_all = TRUE) %>% 
+  group_by(Gear, Island) %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = Gear, values_from = N) %>% 
+  gt() %>% 
+  tab_header(title = "Number of Sampling Events by Island")
+
+lengths.combo %>% 
+  ggplot(aes(LENGTH_CM)) +
+  geom_density(aes(colour = Gear), size = .75) + 
+  facet_wrap(~Island) +
+  theme_classic() +
+  labs(main = "Length Distributions by Island")
+
+```
+
+
+#### Sampling locations with small Opaka  
+
+Both [camera](#cameralengths) and [research fishing](#fishinglengths) had a secondary mode of smaller fish
+```{r}
+small.fish.both <- lengths.combo %>% 
+  filter((LENGTH_CM > 20 & LENGTH_CM < 25 & Gear == "Research Fishing") | (Gear == "Camera" & LENGTH_CM > 10 & LENGTH_CM < 15)) %>% 
+  distinct(PSU, .keep_all = TRUE) %>% 
+  merge(psu, by = "PSU")  
+  
+HI %>% 
+  filter(STATEFP == 15) %>% 
+  ggplot() +
+  geom_sf() +
+  geom_point(data = small.fish.both, 
+             aes(x = lon_deg, y = lat_deg, colour = STRATA.x, shape = Gear), alpha = .6, size = 2.75) +
+  geom_text(data = islands, aes(lon_deg, lat_deg, label = Island), size = 4) + 
+  theme_classic() +
+  labs(y = "Latitude", x = "Longitude")
+
+```
+
+
+## Summary 
+
+Based on the exploratory analysis above, we have several conclusions regarding the BFISH MOUSS camera and research fishing length composition data.  
+  1.    The complete length composition distributions for camera and research fishing look very different, which may suggest different selectivity patterns.    
+  2.    We investigated the occurrence of the mode at smaller sizes in both the camera and research fishing length data. All smaller Opaka (~ <= 20cm) were caught in shallow water strata (HB_H_S, HB_L_S, and SB_A_S). With fishing, small Opaka were only caught in HB_H_S strata but the camera recorded small Opaka on both hard and soft-bottom and at all slope levels (high, low, and all).   
+  3.    Annually, the mode of smaller fish seen by the camera varies between 15-20cm.    
+  4.    Softbottom habitat had a very unique length distribution. All individuals were small, however the number of sample events in that habitat was very low (n = 6).   
+  5.    We investigated the occurrence of the mode of larger Opaka in the camera length data. Larger individuals were caught at hardbottom, high slope sites of shallow and medium depth. Every year and on all islands, there was a consistent mode around 60 cm.   
+  6.    Hardbottom, low-slope, shallow strata have mostly medium sized Opaka, which are similar size to the majority of Opaka caught by research fishing.   
+  7.    For Opaka, it looks like there are differences in gear selectivity, particularly when you look by across strata. In softbottom areas, the camera only recorded small Opaka and the research fishing caught almost only large Opaka. The length distributions from the HB_H_S look very similar to the total length distribution (likely because they have the most number of sampling events), where the camera lengths are flat and more uniform across length classes but the research fishing has a large around 40 cm and a smaller peak at around 20 cm.  
