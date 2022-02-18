@@ -1,0 +1,1806 @@
+---
+title: "2023_Deep_7_catch_exploration"
+author: "John Syslo"
+date: "June 15, 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+## R Markdown file for exploring catch of each Deep 7 species through time by gear, area, and region
+
+
+```{r}
+
+rm(list=ls())
+
+# --Combine input datasets into single dataset--------------------------
+library(foreign)
+
+#early=read.dbf("D:\\Stock assessments\\Hawaii\\MHI_bottomfish_2017\\DAR_assessment_data\\PaulTao_data\\HFY48_93E.dbf",as.is=T)
+early=read.csv("C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Raw data\\picdr_112849_fy48_15.csv")
+
+#late=read.dbf("D:\\Stock assessments\\Hawaii\\MHI_bottomfish_2017\\DAR_assessment_data\\PaulTao_data\\hf94c15F.dbf",as.is=T)
+late=read.csv("C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Raw data\\picdr_112849_fy16_18.csv")
+
+#add 2019 data here
+d2019=read.csv("C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Raw data\\picdr_112970_fy19.csv")
+
+#dim(early)
+#dim(late)
+#dim(d2019)
+#names(early)
+#names(late)
+#names(d2019)
+
+#not needed because fields match for update data:
+#early[,c("O_LICENSE","O_LNAME","O_FNAME","O_VESSEL","O_USCG","O_HA_NO","CHNG")]=NA
+fulldata=rbind(early,late,d2019)
+#dim(fulldata) 
+
+#Add lbs field as maximum of LBS and LBS_SOLD
+fulldata$lbs=pmax(fulldata$LBS,fulldata$LBS_SOLD,na.rm=T)
+
+################################################################
+#2020- RELATED TO CPUE BUT EASY TO DO HERE:
+#For report table 6, proportion of records with some name info. by year
+XX<-aggregate(fulldata$FNAME,by=list(fulldata$FYEAR),FUN=length)
+
+
+#dim(fulldata[which(fulldata$FNAME == "NULL" & fulldata$LNAME == "NULL"),])
+no_name<-fulldata[which(fulldata$FNAME == "NULL" & fulldata$LNAME == "NULL"),]
+y<-aggregate(no_name$FNAME,by=list(no_name$FYEAR),FUN=length)
+
+perc_no_name<-1-y$x/XX$x[1:55]
+
+#do not need because there is no 2019 data:
+#Remove FY2016
+####----#####
+#reddata=fulldata[fulldata$FYEAR<=2015,]
+####----#####
+
+reddata=fulldata #included to reduce number of code changes
+
+# --Use only records of Deep 7 species ----------------------------------
+#Use common names of deep7 species since Gindai has two scientific names
+com_names=c("HAPUUPUU","KALEKALE","OPAKAPAKA","EHU","ONAGA","ehu","LEHI","GINDAI")
+##Species code 36 is also ehu according to Appendix II.4g in 
+#Moffitt et al. 2011 "Bottomfish CPUE standardization workshop 
+#proceedings August 4-6, 2008", but was discontinued in 1989. 
+id=c(15,17,19,21,22,36,58,97)
+
+
+####----#####
+deep7=reddata[reddata$SPECIES%in%id,]
+#dim(deep7)
+####----#####
+
+#Assign ehu species code 36 to ehu code 21.
+deep7[deep7$SPECIES==36,"SPECIES"]=21
+
+#calculate proprotion of Deep7 catch on gear3
+a<-aggregate(deep7$lbs,by=list(deep7$GEAR),FUN=sum)
+b<-aggregate(deep7$lbs,by=list(deep7$GEAR),FUN=length)
+```
+
+Proportion of Deep 7 lbs on Deep-sea handline, followed by proportion of records
+
+```{r echo=FALSE}
+
+
+a$x[4]/sum(a$x)  #0.9779536
+
+
+b$x[4]/sum(b$x) 
+
+# --Use only records from the MHI------------------------------------
+#Read in key table from last assessment for MHI areas (mhi_areas.csv)
+#but keep only those grids Reg Kokbun identified as valid from the
+#CPUE data workshop
+#areasReggie=read.csv("D:\\Stock assessments\\Hawaii\\MHI_bottomfish_2017\\Data exploration\\Workshop_files_Aug16\\Tuesday analyses\\BF_Area_Grid_Reggie.csv",header=T)
+areasReggie=read.csv("C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Data prep files\\Catch\\BF_Area_Grid_Reggie.csv",header=T)
+valid=areasReggie[which(areasReggie$Valid.==""),]$area
+
+#Remove non-valid subareas (A and B) from area 16123 as well as 
+#records from 16123 without a subarea specified
+####----#####
+mhidata=deep7[deep7$AREA%in%valid,] #valid areas
+mhidata=mhidata[!mhidata$SUBAREA%in%c("A","B"),] #remove known invalid subareas (16123A and 16123B)
+mhidata=mhidata[!(mhidata$AREA==16123 & is.na(mhidata$SUBAREA)),] #remove the 16123 records without a subarea distinction
+####----#####
+
+
+
+# --Partition invalid areas to known mhi ares-----------------------------
+#THE FOLLOWING STATS HAVE NOT BEEN UPDATED FOR 2020, but 1280 records are not valid
+#Based on proportion of species/year in mhi area compared to nwhi ares
+#Invalid areas include 0's, ponds, and non valid MHI areas
+#5 areas (17 records) are ponds, 1249 records are area=0, 317 areas (274 records) aren't valid and aren't area=0
+invalid=areasReggie[which(areasReggie$Valid.!=""),]$area
+notvalid=deep7[deep7$AREA%in%invalid,]
+
+#Need NWHI areas as well
+#NWHI areas are those not in mhi_areas.csv
+####----#####
+nwhidata=deep7[!deep7$AREA%in%areasReggie$area,]
+####----#####
+
+#Calculate proportion of fish by species and year in MHI vs NWHI
+agg_mhi=aggregate(mhidata$lbs,by=list("FYEAR"=mhidata$FYEAR,"SPECIES"=mhidata$SPECIES),FUN=sum)
+mhi_table=matrix(agg_mhi$x,length(1948:2019),length(id[-6]),dimnames=list(1948:2019,id[-6]))
+
+agg_nwhi=aggregate(nwhidata$lbs,by=list("FYEAR"=nwhidata$FYEAR,"SPECIES"=nwhidata$SPECIES),FUN=sum)
+comb_agg=merge(agg_mhi,agg_nwhi,by=c("FYEAR","SPECIES"),all.x=T)
+comb_agg[is.na(comb_agg$x.y),"x.y"]=0
+comb_agg$percMHI=comb_agg$x.x/(comb_agg$x.x+comb_agg$x.y)
+
+
+agg_inval=aggregate(notvalid$lbs,by=list("FYEAR"=notvalid$FYEAR,"SPECIES"=notvalid$SPECIES),FUN=sum)
+comb_all=merge(comb_agg,agg_inval,by=c("FYEAR","SPECIES"),all=T)
+comb_all$add_catch=comb_all$percMHI*comb_all$x
+
+
+#########################################################################################################
+#Produce 2021 Update Assessment catch files:
+#New data supposedly has invalid areas as NA as well, which changes the number and catch attributed to invalid areas
+area_NA<-deep7[which(is.na(deep7$AREA)),]  #don't see any
+
+
+invalid_ADD=matrix(comb_all$add_catch,length(1948:2019),length(id[-6]),dimnames=list(1948:2019,id[-6]))
+invalid_ADD[is.na(invalid_ADD)]=0
+
+#Final reported catch table
+final_reported_table=round(invalid_ADD+mhi_table,2)
+
+##To obtain 2016 catch data, data were pulled at a later time than for the above data.
+#Values from this pull were taken for fishing year 2016 only in MHI and for deep7 species.
+#For 2016, there was no species code 36 for ehu. There was also no fishing in the NWHI, but
+#only catch from valid MHI areas was used.
+
+#values for 2016 were, following species code c(15,17,19,21,22,58,97)
+catch2019=c(10537.3,13576.1,140722.1,32746.6,73706.3,7801.7,1988.6)
+#JS brought these in above for 2019
+
+
+#Final reported catch table with 2019 catch data
+final_reported_table=rbind(final_reported_table,"2019"=catch2019)
+
+# --Output material-------------------------------------
+#Final dataset - Only 1948-2015
+#write.csv(mhidata,"D:\\Stock assessments\\Hawaii\\MHI_bottomfish_2017\\UptoDate files\\Finalized_catch_dataset.csv",row.names=F)
+
+#Final reported table
+#write.csv(final_reported_table,"C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Data prep files\\Catch\\Reported_catch_table.csv",row.names=T)
+
+#Read in unreported ratios and output final unreported table
+#These ratios were copied from Brodziak et al. 2011 and values
+#from 2010 were copied through 2015. 
+#Values for 1998-2001 were calcualted from methods described in
+#Courtney and Brodziak (2011) (Scenario II)
+Us=read.csv("C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Data prep files\\Catch\\Unreported_ratios.csv",header=T,row.names=1)
+
+#copy 2015 values to 2016
+#Us=rbind(Us,"2016"=Us[68,]) #JS commented out for now - we don't have 2019
+
+#Final unreported table
+final_unreported_table=Us*final_reported_table
+#write.csv(final_unreported_table,"C:\\Users\\John.Syslo\\Documents\\2020_Deep_7\\2020 Data prep files\\Catch\\Unreported_catch_table.csv",row.names=T)
+
+#Final total catch
+final_totalcatch_table=final_unreported_table+final_reported_table
+#write.csv(final_totalcatch_table,"C:\\Users\\John.Syslo\\Documents\\2020 Deep 7\\2020 Data prep files\\Catch\\Total_catch_table.csv",row.names=T)
+
+#Ratio of total unreported to reported in 2012-2019
+#mean(tail(rowSums(final_unreported_table),6)[-6]/tail(rowSums(final_reported_table),6)[-6])
+###################################################################################################################
+
+
+
+
+
+################################################################################################################
+#investigate catch by year, region, and gear by species - 6-4-21################################################
+#################################################################################################################
+
+
+## Cut Area Polygons
+mhidata$region = cut(as.numeric(mhidata$AREA), breaks = c(99,300,400,500,20000), labels = c("BIG ISLAND","MAUI NUI","OAHU",'KAUAI-NIIHAU'))
+library(ggplot2)
+
+```
+
+#Number of catch records by region for Deep 7 species pooled
+
+```{r}
+
+ggplot(mhidata, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(mhidata$region)
+
+
+#catch by species by region
+#com_names=c("HAPUUPUU","KALEKALE","OPAKAPAKA","EHU","ONAGA","ehu","LEHI","GINDAI")
+##Species code 36 is also ehu according to Appendix II.4g in 
+#Moffitt et al. 2011 "Bottomfish CPUE standardization workshop 
+#proceedings August 4-6, 2008", but was discontinued in 1989. 
+#id=c(15,17,19,21,22,36,58,97)
+
+#plot complex catch by species through time - Errors on 6/16/21
+#plot proportion in each region by year
+Deep7_year_sp<-aggregate(mhidata$lbs,by=list(mhidata$FYEAR,mhidata$SPECIES),sum)
+
+
+Deep7_year<-aggregate(mhidata$lbs,by=list(mhidata$FYEAR),sum)
+
+Deep7_temp<-merge(Deep7_year_sp,Deep7_year,by.x="Group.1",by.y="Group.1")
+Deep7_prop<-as.data.frame(cbind(Deep7_temp$Group.2, as.character(Deep7_temp$Group.1), (Deep7_temp$x.x/Deep7_temp$x.y)*100))
+names(Deep7_prop)<-c("Species", "FYEAR", "Percentage")
+
+#ggplot(Deep7_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Species) + 
+# geom_area(alpha=1 , size=1, colour="white") + 
+#  ggtitle("Reported deep 7 Catch by Species"))
+
+
+```
+
+#More detailed analyses by species
+
+#Opakapaka
+
+```{r }
+#look at region
+pakadat<-mhidata[mhidata$SPECIES==19,]
+paka_cat_reg<-aggregate(pakadat$lbs,by=list(pakadat$region),sum)
+samps<-tapply(pakadat$lbs,list(pakadat$FYEAR,pakadat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(pakadat$lbs,by=list(pakadat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Paka")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(pakadat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+#summary(pakadat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total paka catch look like by season?
+d<-aggregate(pakadat$lbs,by=list(pakadat$R_MONTH, pakadat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Paka")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(pakadat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(pakadat$region)
+
+#plot proportion in each region by year
+paka_year_reg<-aggregate(pakadat$lbs,by=list(pakadat$region,pakadat$FYEAR),sum)
+paka_year<-aggregate(pakadat$lbs,by=list(pakadat$FYEAR),sum)
+
+paka_temp<-merge(paka_year_reg,paka_year,by.x="Group.2",by.y="Group.1")
+paka_prop<-as.data.frame(cbind(paka_temp$Group.2, as.character(paka_temp$Group.1), (paka_temp$x.x/paka_temp$x.y)*100))
+names(paka_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of paka catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(paka_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+paka_cat_area<-aggregate(pakadat$lbs,by=list(pakadat$AREA),sum)
+Paka_area_sort<-paka_cat_area[order(-paka_cat_area$x),]
+x<-Paka_area_sort$x/sum(Paka_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 60.4% of paka, top 20 account for 74.1%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+Paka_area_sort[1:10,]
+#8 are Maui Nui, 2 are leeward Big Island
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+library(sf)
+HDAR_areas <- st_read(
+  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,paka_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+paka_dat_50<-pakadat[pakadat$FYEAR>=1950 & pakadat$FYEAR<1960,]
+paka_cat_area_50<-aggregate(paka_dat_50$lbs,by=list(paka_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1950-1959")
+
+
+#catch by area 1960-1969
+paka_dat_60<-pakadat[pakadat$FYEAR>=1960 & pakadat$FYEAR<1970,]
+paka_cat_area_60<-aggregate(paka_dat_60$lbs,by=list(paka_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1960-1969")
+
+
+#catch by area 1970-1979
+paka_dat_70<-pakadat[pakadat$FYEAR>=1970 & pakadat$FYEAR<1980,]
+paka_cat_area_70<-aggregate(paka_dat_70$lbs,by=list(paka_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1970-1979")
+
+#catch by area 1980-1989
+paka_dat_80<-pakadat[pakadat$FYEAR>=1980 & pakadat$FYEAR<1990,]
+paka_cat_area_80<-aggregate(paka_dat_80$lbs,by=list(paka_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1980-1989")
+
+
+#catch by area 1990-1999
+paka_dat_90<-pakadat[pakadat$FYEAR>=1990 & pakadat$FYEAR<2000,]
+paka_cat_area_90<-aggregate(paka_dat_90$lbs,by=list(paka_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 1990-1999")
+
+#catch by area 2000-2009
+paka_dat_00<-pakadat[pakadat$FYEAR>=2000 & pakadat$FYEAR<2010,]
+paka_cat_area_00<-aggregate(paka_dat_00$lbs,by=list(paka_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 2000-2009")
+
+
+#catch by area 2010-2019
+paka_dat_10<-pakadat[pakadat$FYEAR>=2010 & pakadat$FYEAR<2020,]
+paka_cat_area_10<-aggregate(paka_dat_10$lbs,by=list(paka_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,paka_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Paka 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(pakadat$lbs,by=list(pakadat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(pakadat$lbs,by=list(pakadat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.9706 of lbs
+b$x[4]/sum(b$x)  #0.949 of trips
+
+Paka_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up remaining xx%.  Omit "other" for now
+
+
+c<-aggregate(pakadat$lbs,by=list(pakadat$GEAR, pakadat$FYEAR),FUN=sum)
+d<-aggregate(pakadat$lbs,by=list(pakadat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+paka_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(paka_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+paka_prop_gear_red<-paka_prop_gear[paka_prop_gear$Gear == 3 | paka_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(paka_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Onaga
+
+```{r }
+#look at region
+onagadat<-mhidata[mhidata$SPECIES==22,]
+onaga_cat_reg<-aggregate(onagadat$lbs,by=list(onagadat$region),sum)
+samps<-tapply(onagadat$lbs,list(onagadat$FYEAR,onagadat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(onagadat$lbs,by=list(onagadat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Onaga")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(onagadat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(onagadat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(onagadat$lbs,by=list(onagadat$R_MONTH, onagadat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Onaga")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(onagadat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(onagadat$region)
+
+#plot proportion in each region by year
+onaga_year_reg<-aggregate(onagadat$lbs,by=list(onagadat$region,onagadat$FYEAR),sum)
+onaga_year<-aggregate(onagadat$lbs,by=list(onagadat$FYEAR),sum)
+
+onaga_temp<-merge(onaga_year_reg,onaga_year,by.x="Group.2",by.y="Group.1")
+onaga_prop<-as.data.frame(cbind(onaga_temp$Group.2, as.character(onaga_temp$Group.1), (onaga_temp$x.x/onaga_temp$x.y)*100))
+names(onaga_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of onaga catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(onaga_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+onaga_cat_area<-aggregate(onagadat$lbs,by=list(onagadat$AREA),sum)
+onaga_area_sort<-onaga_cat_area[order(-onaga_cat_area$x),]
+x<-onaga_area_sort$x/sum(onaga_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 62.1% of onaga, top 20 account for 76.1%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+onaga_area_sort[1:10,]
+#8 are Maui Nui, 1 is leeward Big Island
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,onaga_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+onaga_dat_50<-onagadat[onagadat$FYEAR>=1950 & onagadat$FYEAR<1960,]
+onaga_cat_area_50<-aggregate(onaga_dat_50$lbs,by=list(onaga_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1950-1959")
+
+
+#catch by area 1960-1969
+onaga_dat_60<-onagadat[onagadat$FYEAR>=1960 & onagadat$FYEAR<1970,]
+onaga_cat_area_60<-aggregate(onaga_dat_60$lbs,by=list(onaga_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1960-1969")
+
+
+#catch by area 1970-1979
+onaga_dat_70<-onagadat[onagadat$FYEAR>=1970 & onagadat$FYEAR<1980,]
+onaga_cat_area_70<-aggregate(onaga_dat_70$lbs,by=list(onaga_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1970-1979")
+
+#catch by area 1980-1989
+onaga_dat_80<-onagadat[onagadat$FYEAR>=1980 & onagadat$FYEAR<1990,]
+onaga_cat_area_80<-aggregate(onaga_dat_80$lbs,by=list(onaga_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1980-1989")
+
+
+#catch by area 1990-1999
+onaga_dat_90<-onagadat[onagadat$FYEAR>=1990 & onagadat$FYEAR<2000,]
+onaga_cat_area_90<-aggregate(onaga_dat_90$lbs,by=list(onaga_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 1990-1999")
+
+#catch by area 2000-2009
+onaga_dat_00<-onagadat[onagadat$FYEAR>=2000 & onagadat$FYEAR<2010,]
+onaga_cat_area_00<-aggregate(onaga_dat_00$lbs,by=list(onaga_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 2000-2009")
+
+
+#catch by area 2010-2019
+onaga_dat_10<-onagadat[onagadat$FYEAR>=2010 & onagadat$FYEAR<2020,]
+onaga_cat_area_10<-aggregate(onaga_dat_10$lbs,by=list(onaga_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,onaga_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Onaga 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(onagadat$lbs,by=list(onagadat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(onagadat$lbs,by=list(onagadat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.9897 of lbs
+b$x[4]/sum(b$x)  #0.9811 of trips
+
+onaga_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up XX%.  Omit "other" for now
+
+
+c<-aggregate(onagadat$lbs,by=list(onagadat$GEAR, onagadat$FYEAR),FUN=sum)
+d<-aggregate(onagadat$lbs,by=list(onagadat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+onaga_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(onaga_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+onaga_prop_gear_red<-onaga_prop_gear[onaga_prop_gear$Gear == 3 | onaga_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(onaga_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Ehu
+
+```{r }
+#look at region
+ehudat<-mhidata[mhidata$SPECIES==21,]
+ehu_cat_reg<-aggregate(ehudat$lbs,by=list(ehudat$region),sum)
+samps<-tapply(ehudat$lbs,list(ehudat$FYEAR,ehudat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(ehudat$lbs,by=list(ehudat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Ehu")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(ehudat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(ehudat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(ehudat$lbs,by=list(ehudat$R_MONTH, ehudat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Ehu")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(ehudat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(ehudat$region)
+
+#plot proportion in each region by year
+ehu_year_reg<-aggregate(ehudat$lbs,by=list(ehudat$region,ehudat$FYEAR),sum)
+ehu_year<-aggregate(ehudat$lbs,by=list(ehudat$FYEAR),sum)
+
+ehu_temp<-merge(ehu_year_reg,ehu_year,by.x="Group.2",by.y="Group.1")
+ehu_prop<-as.data.frame(cbind(ehu_temp$Group.2, as.character(ehu_temp$Group.1), (ehu_temp$x.x/ehu_temp$x.y)*100))
+names(ehu_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of ehu catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(ehu_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+ehu_cat_area<-aggregate(ehudat$lbs,by=list(ehudat$AREA),sum)
+ehu_area_sort<-ehu_cat_area[order(-ehu_cat_area$x),]
+x<-ehu_area_sort$x/sum(ehu_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 53.1% of ehu top 20 account for 71.5%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+ehu_area_sort[1:10,]
+#6 are Maui Nui, 4 are windward Big Island
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,ehu_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+ehu_dat_50<-ehudat[ehudat$FYEAR>=1950 & ehudat$FYEAR<1960,]
+ehu_cat_area_50<-aggregate(ehu_dat_50$lbs,by=list(ehu_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1950-1959")
+
+
+#catch by area 1960-1969
+ehu_dat_60<-ehudat[ehudat$FYEAR>=1960 & ehudat$FYEAR<1970,]
+ehu_cat_area_60<-aggregate(ehu_dat_60$lbs,by=list(ehu_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1960-1969")
+
+
+#catch by area 1970-1979
+ehu_dat_70<-ehudat[ehudat$FYEAR>=1970 & ehudat$FYEAR<1980,]
+ehu_cat_area_70<-aggregate(ehu_dat_70$lbs,by=list(ehu_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1970-1979")
+
+#catch by area 1980-1989
+ehu_dat_80<-ehudat[ehudat$FYEAR>=1980 & ehudat$FYEAR<1990,]
+ehu_cat_area_80<-aggregate(ehu_dat_80$lbs,by=list(ehu_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1980-1989")
+
+
+#catch by area 1990-1999
+ehu_dat_90<-ehudat[ehudat$FYEAR>=1990 & ehudat$FYEAR<2000,]
+ehu_cat_area_90<-aggregate(ehu_dat_90$lbs,by=list(ehu_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 1990-1999")
+
+#catch by area 2000-2009
+ehu_dat_00<-ehudat[ehudat$FYEAR>=2000 & ehudat$FYEAR<2010,]
+ehu_cat_area_00<-aggregate(ehu_dat_00$lbs,by=list(ehu_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 2000-2009")
+
+
+#catch by area 2010-2019
+ehu_dat_10<-ehudat[ehudat$FYEAR>=2010 & ehudat$FYEAR<2020,]
+ehu_cat_area_10<-aggregate(ehu_dat_10$lbs,by=list(ehu_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,ehu_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Ehu 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(ehudat$lbs,by=list(ehudat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(ehudat$lbs,by=list(ehudat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.9706 of lbs
+b$x[4]/sum(b$x)  #0.949 of trips
+
+ehu_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up remaining 3.7%.  Omit "other" for now
+
+
+c<-aggregate(ehudat$lbs,by=list(ehudat$GEAR, ehudat$FYEAR),FUN=sum)
+d<-aggregate(ehudat$lbs,by=list(ehudat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+ehu_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(ehu_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+ehu_prop_gear_red<-ehu_prop_gear[ehu_prop_gear$Gear == 3 | ehu_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(ehu_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Hapu
+
+```{r }
+#look at region
+hapudat<-mhidata[mhidata$SPECIES==15,]
+hapu_cat_reg<-aggregate(hapudat$lbs,by=list(hapudat$region),sum)
+samps<-tapply(hapudat$lbs,list(hapudat$FYEAR,hapudat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(hapudat$lbs,by=list(hapudat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Hapu")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(hapudat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(hapudat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(hapudat$lbs,by=list(hapudat$R_MONTH, hapudat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Hapu")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(hapudat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(hapudat$region)
+
+#plot proportion in each region by year
+hapu_year_reg<-aggregate(hapudat$lbs,by=list(hapudat$region,hapudat$FYEAR),sum)
+hapu_year<-aggregate(hapudat$lbs,by=list(hapudat$FYEAR),sum)
+
+hapu_temp<-merge(hapu_year_reg,hapu_year,by.x="Group.2",by.y="Group.1")
+hapu_prop<-as.data.frame(cbind(hapu_temp$Group.2, as.character(hapu_temp$Group.1), (hapu_temp$x.x/hapu_temp$x.y)*100))
+names(hapu_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of hapu catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(hapu_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+hapu_cat_area<-aggregate(hapudat$lbs,by=list(hapudat$AREA),sum)
+hapu_area_sort<-hapu_cat_area[order(-hapu_cat_area$x),]
+x<-hapu_area_sort$x/sum(hapu_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 44.9% of hapu, top 20 account for 62.6%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+hapu_area_sort[1:10,]
+#number 1 area is penguin banks, followed by off of Niihau, then a bunch of Maui Nui,then Niihau/Kauai, and 122 (leeward Big Island)
+
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,hapu_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+hapu_dat_50<-hapudat[hapudat$FYEAR>=1950 & hapudat$FYEAR<1960,]
+hapu_cat_area_50<-aggregate(hapu_dat_50$lbs,by=list(hapu_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1950-1959")
+
+
+#catch by area 1960-1969
+hapu_dat_60<-hapudat[hapudat$FYEAR>=1960 & hapudat$FYEAR<1970,]
+hapu_cat_area_60<-aggregate(hapu_dat_60$lbs,by=list(hapu_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1960-1969")
+
+
+#catch by area 1970-1979
+hapu_dat_70<-hapudat[hapudat$FYEAR>=1970 & hapudat$FYEAR<1980,]
+hapu_cat_area_70<-aggregate(hapu_dat_70$lbs,by=list(hapu_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1970-1979")
+
+#catch by area 1980-1989
+hapu_dat_80<-hapudat[hapudat$FYEAR>=1980 & hapudat$FYEAR<1990,]
+hapu_cat_area_80<-aggregate(hapu_dat_80$lbs,by=list(hapu_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1980-1989")
+
+
+#catch by area 1990-1999
+hapu_dat_90<-hapudat[hapudat$FYEAR>=1990 & hapudat$FYEAR<2000,]
+hapu_cat_area_90<-aggregate(hapu_dat_90$lbs,by=list(hapu_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 1990-1999")
+
+#catch by area 2000-2009
+hapu_dat_00<-hapudat[hapudat$FYEAR>=2000 & hapudat$FYEAR<2010,]
+hapu_cat_area_00<-aggregate(hapu_dat_00$lbs,by=list(hapu_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 2000-2009")
+
+
+#catch by area 2010-2019
+hapu_dat_10<-hapudat[hapudat$FYEAR>=2010 & hapudat$FYEAR<2020,]
+hapu_cat_area_10<-aggregate(hapu_dat_10$lbs,by=list(hapu_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,hapu_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Hapu 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(hapudat$lbs,by=list(hapudat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(hapudat$lbs,by=list(hapudat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.964 of lbs
+b$x[4]/sum(b$x)  #0.94 of trips
+
+hapu_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up remaining 2.2%.  Omit "other" for now
+
+
+c<-aggregate(hapudat$lbs,by=list(hapudat$GEAR, hapudat$FYEAR),FUN=sum)
+d<-aggregate(hapudat$lbs,by=list(hapudat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+hapu_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(hapu_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+hapu_prop_gear_red<-hapu_prop_gear[hapu_prop_gear$Gear == 3 | hapu_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(hapu_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Kalekale
+
+```{r }
+#look at region
+kaledat<-mhidata[mhidata$SPECIES==17,]
+kale_cat_reg<-aggregate(kaledat$lbs,by=list(kaledat$region),sum)
+samps<-tapply(kaledat$lbs,list(kaledat$FYEAR,kaledat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(kaledat$lbs,by=list(kaledat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Kalekale")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(kaledat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(kaledat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(kaledat$lbs,by=list(kaledat$R_MONTH, kaledat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Kalekale")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(kaledat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(kaledat$region)
+
+#plot proportion in each region by year
+kale_year_reg<-aggregate(kaledat$lbs,by=list(kaledat$region,kaledat$FYEAR),sum)
+kale_year<-aggregate(kaledat$lbs,by=list(kaledat$FYEAR),sum)
+
+kale_temp<-merge(kale_year_reg,kale_year,by.x="Group.2",by.y="Group.1")
+kale_prop<-as.data.frame(cbind(kale_temp$Group.2, as.character(kale_temp$Group.1), (kale_temp$x.x/kale_temp$x.y)*100))
+names(kale_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of kale catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(kale_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+kale_cat_area<-aggregate(kaledat$lbs,by=list(kaledat$AREA),sum)
+kale_area_sort<-kale_cat_area[order(-kale_cat_area$x),]
+x<-kale_area_sort$x/sum(kale_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 55.5% of kale, top 20 account for 74.4%
+
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+kale_area_sort[1:10,]
+#4 areas Maui nui and 6 around Big Island
+
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,kale_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+kale_dat_50<-kaledat[kaledat$FYEAR>=1950 & kaledat$FYEAR<1960,]
+kale_cat_area_50<-aggregate(kale_dat_50$lbs,by=list(kale_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1950-1959")
+
+
+#catch by area 1960-1969
+kale_dat_60<-kaledat[kaledat$FYEAR>=1960 & kaledat$FYEAR<1970,]
+kale_cat_area_60<-aggregate(kale_dat_60$lbs,by=list(kale_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1960-1969")
+
+
+#catch by area 1970-1979
+kale_dat_70<-kaledat[kaledat$FYEAR>=1970 & kaledat$FYEAR<1980,]
+kale_cat_area_70<-aggregate(kale_dat_70$lbs,by=list(kale_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1970-1979")
+
+#catch by area 1980-1989
+kale_dat_80<-kaledat[kaledat$FYEAR>=1980 & kaledat$FYEAR<1990,]
+kale_cat_area_80<-aggregate(kale_dat_80$lbs,by=list(kale_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1980-1989")
+
+
+#catch by area 1990-1999
+kale_dat_90<-kaledat[kaledat$FYEAR>=1990 & kaledat$FYEAR<2000,]
+kale_cat_area_90<-aggregate(kale_dat_90$lbs,by=list(kale_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 1990-1999")
+
+#catch by area 2000-2009
+kale_dat_00<-kaledat[kaledat$FYEAR>=2000 & kaledat$FYEAR<2010,]
+kale_cat_area_00<-aggregate(kale_dat_00$lbs,by=list(kale_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 2000-2009")
+
+
+#catch by area 2010-2019
+kale_dat_10<-kaledat[kaledat$FYEAR>=2010 & kaledat$FYEAR<2020,]
+kale_cat_area_10<-aggregate(kale_dat_10$lbs,by=list(kale_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,kale_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Kalekale 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(kaledat$lbs,by=list(kaledat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(kaledat$lbs,by=list(kaledat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.944 of lbs
+b$x[4]/sum(b$x)  #0.92 of trips
+
+kale_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up remaining 4.5%.  Omit "other" for now. gear 5 "kaka line# is third at 0.2%
+
+
+c<-aggregate(kaledat$lbs,by=list(kaledat$GEAR, kaledat$FYEAR),FUN=sum)
+d<-aggregate(kaledat$lbs,by=list(kaledat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+kale_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(kale_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+kale_prop_gear_red<-kale_prop_gear[kale_prop_gear$Gear == 3 | kale_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(kale_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Lehi
+
+```{r }
+#look at region
+lehidat<-mhidata[mhidata$SPECIES==58,]
+lehi_cat_reg<-aggregate(lehidat$lbs,by=list(lehidat$region),sum)
+samps<-tapply(lehidat$lbs,list(lehidat$FYEAR,lehidat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(lehidat$lbs,by=list(lehidat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Lehi")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(lehidat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(lehidat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(lehidat$lbs,by=list(lehidat$R_MONTH, lehidat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Lehi")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(lehidat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(lehidat$region)
+
+#plot proportion in each region by year
+lehi_year_reg<-aggregate(lehidat$lbs,by=list(lehidat$region,lehidat$FYEAR),sum)
+lehi_year<-aggregate(lehidat$lbs,by=list(lehidat$FYEAR),sum)
+
+lehi_temp<-merge(lehi_year_reg,lehi_year,by.x="Group.2",by.y="Group.1")
+lehi_prop<-as.data.frame(cbind(lehi_temp$Group.2, as.character(lehi_temp$Group.1), (lehi_temp$x.x/lehi_temp$x.y)*100))
+names(lehi_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of lehi catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(lehi_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+lehi_cat_area<-aggregate(lehidat$lbs,by=list(lehidat$AREA),sum)
+lehi_area_sort<-lehi_cat_area[order(-lehi_cat_area$x),]
+x<-lehi_area_sort$x/sum(lehi_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+
+#top 10 account for 70% of lehi, top 20 account for 85%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+lehi_area_sort[1:10,]
+#3 areas Maui nui and 7 around Big Island
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,lehi_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+lehi_dat_50<-lehidat[lehidat$FYEAR>=1950 & lehidat$FYEAR<1960,]
+lehi_cat_area_50<-aggregate(lehi_dat_50$lbs,by=list(lehi_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1950-1959")
+
+
+#catch by area 1960-1969
+lehi_dat_60<-lehidat[lehidat$FYEAR>=1960 & lehidat$FYEAR<1970,]
+lehi_cat_area_60<-aggregate(lehi_dat_60$lbs,by=list(lehi_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1960-1969")
+
+
+#catch by area 1970-1979
+lehi_dat_70<-lehidat[lehidat$FYEAR>=1970 & lehidat$FYEAR<1980,]
+lehi_cat_area_70<-aggregate(lehi_dat_70$lbs,by=list(lehi_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1970-1979")
+
+#catch by area 1980-1989
+lehi_dat_80<-lehidat[lehidat$FYEAR>=1980 & lehidat$FYEAR<1990,]
+lehi_cat_area_80<-aggregate(lehi_dat_80$lbs,by=list(lehi_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1980-1989")
+
+
+#catch by area 1990-1999
+lehi_dat_90<-lehidat[lehidat$FYEAR>=1990 & lehidat$FYEAR<2000,]
+lehi_cat_area_90<-aggregate(lehi_dat_90$lbs,by=list(lehi_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 1990-1999")
+
+#catch by area 2000-2009
+lehi_dat_00<-lehidat[lehidat$FYEAR>=2000 & lehidat$FYEAR<2010,]
+lehi_cat_area_00<-aggregate(lehi_dat_00$lbs,by=list(lehi_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 2000-2009")
+
+
+#catch by area 2010-2019
+lehi_dat_10<-lehidat[lehidat$FYEAR>=2010 & lehidat$FYEAR<2020,]
+lehi_cat_area_10<-aggregate(lehi_dat_10$lbs,by=list(lehi_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,lehi_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Lehi 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(lehidat$lbs,by=list(lehidat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(lehidat$lbs,by=list(lehidat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.955 of lbs
+b$x[4]/sum(b$x)  #0.92 of trips
+
+lehi_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 9 (palu ahi) makes up remaining 2.4%.  gear 4 "inshor ehandline# is third at 1.44%
+
+
+
+c<-aggregate(lehidat$lbs,by=list(lehidat$GEAR, lehidat$FYEAR),FUN=sum)
+d<-aggregate(lehidat$lbs,by=list(lehidat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+lehi_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(lehi_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3, and 9
+lehi_prop_gear_red<-lehi_prop_gear[lehi_prop_gear$Gear == 3 | lehi_prop_gear$Gear == 4| lehi_prop_gear$Gear == 9,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(lehi_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```
+
+#Gindai
+
+```{r }
+#look at region
+gindaidat<-mhidata[mhidata$SPECIES==97,]
+gindai_cat_reg<-aggregate(gindaidat$lbs,by=list(gindaidat$region),sum)
+samps<-tapply(gindaidat$lbs,list(gindaidat$FYEAR,gindaidat$AREA),length)
+```
+
+Catch through time
+
+```{r }
+#what does total paka catch look like through time?
+d<-aggregate(gindaidat$lbs,by=list(gindaidat$FYEAR),FUN=sum)
+
+plot(d,type="o", ylab="lbs caught",xlab="Year", Main = "Gindai")
+
+```
+
+Number of catch records by year
+
+```{r }
+ggplot(gindaidat, aes(x = FYEAR))+theme_bw()+geom_histogram(stat = 'count')
+summary(gindaidat$FYEAR)
+```
+
+Catch by calendar month (monthly mean among calendar years) 
+
+```{r }
+#what does total Onaga catch look like by season?
+d<-aggregate(gindaidat$lbs,by=list(gindaidat$R_MONTH, gindaidat$R_YEAR),FUN=sum)
+e<-tapply(d$x,d$Group.1,mean)
+
+plot(e,type="o", ylab="AVG of total lbs caught (by year)",xlab="Month", Main = "Gindai")
+
+```
+
+
+Number of catch records by region (years pooled)
+
+```{r }
+ggplot(gindaidat, aes(x = region))+theme_bw()+geom_histogram(stat = 'count')
+summary(gindaidat$region)
+
+#plot proportion in each region by year
+gindai_year_reg<-aggregate(gindaidat$lbs,by=list(gindaidat$region,gindaidat$FYEAR),sum)
+gindai_year<-aggregate(gindaidat$lbs,by=list(gindaidat$FYEAR),sum)
+
+gindai_temp<-merge(gindai_year_reg,gindai_year,by.x="Group.2",by.y="Group.1")
+gindai_prop<-as.data.frame(cbind(gindai_temp$Group.2, as.character(gindai_temp$Group.1), (gindai_temp$x.x/gindai_temp$x.y)*100))
+names(gindai_prop)<-c("FYEAR", "Region", "Percentage")
+
+```
+
+Proportion of gindai catch (in lbs) by island region through time 
+
+```{r }
+
+library(ggplot2)
+
+ggplot(gindai_prop, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Region)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Region and and Year")
+
+```
+
+Look at catch by HDAR reporting area
+
+```{r }
+#look at area
+gindai_cat_area<-aggregate(gindaidat$lbs,by=list(gindaidat$AREA),sum)
+gindai_area_sort<-gindai_cat_area[order(-gindai_cat_area$x),]
+x<-gindai_area_sort$x/sum(gindai_area_sort$x)
+```
+
+Proportion of records in top 10 and 20 areas, respectively (years pooled).
+
+```{r }
+sum(x[1:10])
+sum(x[1:20])
+
+#top 10 account for 40.4% of gindai, top 20 account for 62.6%
+```
+
+
+Top 10 areas ("Group.1")
+
+```{r }
+gindai_area_sort[1:10,]
+#more diffuse - P. Banks is #1, followed by ka'ula/kauai, Big island
+
+```
+
+Maps of catch by HDAR reporting area (total and decade) 
+
+```{r }
+#try to produce map of catch by reporting area by decade
+#library(sf)
+#HDAR_areas <- st_read(
+#  "C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Grids\\DAR_Reporting_grids_all.shp")
+
+#plot(st_geometry(HDAR_areas))
+#plotting strange, which may be function of wrong longitude values (i.e., not negative).  these seem to be NWHI
+
+#try to define extent
+#plot(HDAR_areas["AREA_ID"], xlim =c(-165, -150),ylim = c(17.5, 23),col="white")
+
+
+#ggplot(HDAR_areas["AREA_ID"])+ #extent issues
+#  geom_sf(aes(fill = AREA_ID)) +
+#  geom_sf_label(aes(label = AREA_ID))
+
+#append catch by area
+
+#catch by area 1948-2019
+xy<-merge(HDAR_areas,gindai_cat_area,by.x="AREA_ID",by.y="Group.1",all.x=TRUE) #keep all areas for plotting
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1948-2019")
+
+#how do I get labels?
+#plot(xy["x"], xlim = c(-162, -153),ylim = c(20, 21),main="Paka 1948-2019", text=xy["AREA_ID"]) #NOPE!!
+#geom_text() #ugh this is ggplot
+
+#catch by area 1950-1959
+gindai_dat_50<-gindaidat[gindaidat$FYEAR>=1950 & gindaidat$FYEAR<1960,]
+gindai_cat_area_50<-aggregate(gindai_dat_50$lbs,by=list(gindai_dat_50$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_50,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1950-1959")
+
+
+#catch by area 1960-1969
+gindai_dat_60<-gindaidat[gindaidat$FYEAR>=1960 & gindaidat$FYEAR<1970,]
+gindai_cat_area_60<-aggregate(gindai_dat_60$lbs,by=list(gindai_dat_60$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_60,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1960-1969")
+
+
+#catch by area 1970-1979
+gindai_dat_70<-gindaidat[gindaidat$FYEAR>=1970 & gindaidat$FYEAR<1980,]
+gindai_cat_area_70<-aggregate(gindai_dat_70$lbs,by=list(gindai_dat_70$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_70,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1970-1979")
+
+#catch by area 1980-1989
+gindai_dat_80<-gindaidat[gindaidat$FYEAR>=1980 & gindaidat$FYEAR<1990,]
+gindai_cat_area_80<-aggregate(gindai_dat_80$lbs,by=list(gindai_dat_80$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_80,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1980-1989")
+
+
+#catch by area 1990-1999
+gindai_dat_90<-gindaidat[gindaidat$FYEAR>=1990 & gindaidat$FYEAR<2000,]
+gindai_cat_area_90<-aggregate(gindai_dat_90$lbs,by=list(gindai_dat_90$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_90,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 1990-1999")
+
+#catch by area 2000-2009
+gindai_dat_00<-gindaidat[gindaidat$FYEAR>=2000 & gindaidat$FYEAR<2010,]
+gindai_cat_area_00<-aggregate(gindai_dat_00$lbs,by=list(gindai_dat_00$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_00,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 2000-2009")
+
+
+#catch by area 2010-2019
+gindai_dat_10<-gindaidat[gindaidat$FYEAR>=2010 & gindaidat$FYEAR<2020,]
+gindai_cat_area_10<-aggregate(gindai_dat_10$lbs,by=list(gindai_dat_10$AREA),sum)
+
+xy<-merge(HDAR_areas,gindai_cat_area_10,by.x="AREA_ID",by.y="Group.1",all.x=TRUE)
+plot(xy["x"], xlim =c(-162, -153),ylim = c(20, 21),main="Gindai 2010-2019")
+
+```
+
+Catch by gear
+
+```{r }
+#examine catch by gear and through time
+#trolling (gear codes "6","61","62","63", and "70")
+
+#calculate proprotion of paka catch on gear3 (deep-sea handline)
+a<-aggregate(gindaidat$lbs,by=list(gindaidat$GEAR),FUN=sum)
+
+
+
+b<-aggregate(gindaidat$lbs,by=list(gindaidat$GEAR),FUN=length)
+```
+
+Proportion of catch (lbs) and records, respectively, on deep-sea handline
+
+```{r }
+a$x[4]/sum(a$x)  #0.951 of lbs
+b$x[4]/sum(b$x)  #0.954 of trips
+
+gindai_gear_sort<-a[order(-a$x),]
+
+#how many gears should we include in temporal analysis? code 4 (inshore handline) makes up remaining xx%.  Omit "other" for now
+
+
+c<-aggregate(gindaidat$lbs,by=list(gindaidat$GEAR, gindaidat$FYEAR),FUN=sum)
+d<-aggregate(gindaidat$lbs,by=list(gindaidat$FYEAR),FUN=sum)
+
+c_temp<-merge(c,d,by.x="Group.2",by.y="Group.1")
+gindai_prop_gear<-as.data.frame(cbind(c_temp$Group.2, as.character(c_temp$Group.1), (c_temp$x.x/c_temp$x.y)*100))
+names(gindai_prop_gear)<-c("FYEAR", "Gear", "Percentage")
+
+#reduce to gear 3 and 4
+gindai_prop_gear_red<-gindai_prop_gear[gindai_prop_gear$Gear == 3 | gindai_prop_gear$Gear == 4,]
+```
+
+Catch by gear through time
+
+```{r }
+ggplot(gindai_prop_gear_red, aes(x = as.numeric(FYEAR), y = as.numeric(Percentage), fill=Gear)) + 
+  geom_area(alpha=1 , size=1, colour="white") + 
+  ggtitle("Percentage by Gear and and Year")
+
+```

@@ -8,7 +8,6 @@ Code for data exploration, preparation, standardization, analysis, and model dev
 Preliminary data exploration summaries for the BFISH survey, FRS, DRS, and shark depredation datasets can be found [here.](https://github.com/PIFSCstockassessments/MHI_Bottomfish_2023/blob/main/index.md)
 
 
-
 <!-- Do not edit below. This adds the Disclaimer and NMFS footer. -->
 
 -----

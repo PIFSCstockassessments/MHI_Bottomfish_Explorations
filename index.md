@@ -8,12 +8,15 @@
   
 
   3. [Opakapaka FRS Weight Frequency Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/FRS_Opaka_Investigation.html)
+
+  
+  4. [Deep 7 Catch]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/2023-Deep-7-catch-exploration.html)
   
 
-  4. [Deep 7 FRS Weight Frequency Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep7_FRS_Investigation.html)
+  5. [Deep 7 FRS Weight Frequency Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep7_FRS_Investigation.html)
   
 
-  5. [Deep 7 DRS Weight Frequency Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep7_DRS.html)
+  6. [Deep 7 DRS Weight Frequency Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Deep7_DRS.html)
   
   
-  6. [Shark Depredation Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Shark_depredation.html)
+  7. [Shark Depredation Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Shark_depredation.html)
