@@ -1,0 +1,38 @@
+
+
+<!-- # Nicholas Ducharme-Barth
+# 03/15/2022
+# CPUE data exploration for BFISH research fishing data
+# Copyright (c) 2022 Nicholas Ducharme-Barth
+# You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ -->
+---
+title: "CPUE Data Exploration - BFISH Research Fishing"
+author: "Nicholas Ducharme-Barth"
+date: "03/15/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+
+```{r setup, include=FALSE}
+
+	#_____________________________________________________________________________________________________________________________
+	# load packages
+		knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+		library(data.table)
+		library(magrittr)
+		library(ggplot2)
+		library(ggthemes)
+	#_____________________________________________________________________________________________________________________________
+	# set working directory
+		proj.dir = "D:/HOME/SAP/2024_Deep7/"
+		setwd(proj.dir)
+		source("D:/HOME/SAP/Code/Utilities/turbo.r")
+
+		# plot_dir = "D:/HOME/SAP/Code/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/BFISH_CPUE/")
+		# dir.create(plot_dir,recursive=TRUE,showWarnings=FALSE)
+
+```
