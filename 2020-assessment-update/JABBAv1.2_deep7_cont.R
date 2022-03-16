@@ -620,7 +620,26 @@ JABBA = "JABBA.jags"
 
 
 # PARAMETERS TO MONITOR
-params <- c("K","r", "q", "psi","sigma2", "tau2","m","Hmsy","SBmsy", "MSY", "BtoBmsy","HtoHmsy","CPUE","Proc.Dev","P","SB","prP","prBtoBmsy","prHtoHmsy","TOE")
+params <- c("K",
+            "r", 
+            "q", 
+            "psi",
+            "sigma2", 
+            "tau2",
+            "m",
+            "Hmsy",
+            "SBmsy", 
+            "MSY", 
+            "BtoBmsy",
+            "HtoHmsy",
+            "CPUE",
+            "Proc.Dev",
+            "P",
+            "SB",
+            "prP",
+            "prBtoBmsy",
+            "prHtoHmsy",
+            "TOE")
 
 
 cat(paste0("\n","><> RUN ",Mod.names," model for ",assessment," ",Scenario," in JAGS <><","\n","\n"))
@@ -905,8 +924,8 @@ B_Bmsy.cur = posteriors$BtoBmsy[,c(n.years)]
 man.dat = data.frame(man.dat,Depletion,B_Bmsy.cur,H_Hmsy.cur)
 
 results = round(t(cbind(apply(par.dat,2,quantile,c(0.025,0.5,0.975)))),6)
-
-results = data.frame(Median = results[,2],LCI=results[,1],UCI=results[,3],Geweke.p=round(pvalues,3),Heidel.p = round(heidle[,3],3))
+results.mean = round(cbind(apply(par.dat, 2, mean)),6)
+results = data.frame(Median = results[,2],LCI=results[,1],UCI=results[,3],Geweke.p=round(pvalues,3),Heidel.p = round(heidle[,3],3), Mean = results.mean[,1])
 
 ref.points = round(t(cbind(apply(man.dat,2,quantile,c(0.025,0.5,0.975)))),3)
 
