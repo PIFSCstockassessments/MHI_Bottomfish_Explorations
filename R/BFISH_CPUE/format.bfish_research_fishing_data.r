@@ -2,9 +2,7 @@
 
 # Nicholas Ducharme-Barth
 # 03/09/2022
-# BFISH data exploration
-# 1) research fishing
-# 2) bottom camera
+# Format BFISH research fishing data
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -12,8 +10,6 @@
 # load packages
 	library(data.table)
 	library(magrittr)
-	library(ggplot2)
-	library(ggthemes)
 
 #_____________________________________________________________________________________________________________________________
 # set working directory
@@ -122,17 +118,3 @@
 		save(PSU_table,file=paste0(proj.dir,"Data/PSU_table.RData"))
 		save(research_fishing_dt,file=paste0(proj.dir,"Data/research_fishing_dt.RData"))
 
-#_____________________________________________________________________________________________________________________________
-# plot summaries research fishing
-
-#_____________________________________________________________________________________________________________________________
-# bring in camera data
-
-#_____________________________________________________________________________________________________________________________
-# plot summaries camera data
-
-#_____________________________________________________________________________________________________________________________
-# combine research and camera data
-
-#_____________________________________________________________________________________________________________________________
-# plot summaries combined data
