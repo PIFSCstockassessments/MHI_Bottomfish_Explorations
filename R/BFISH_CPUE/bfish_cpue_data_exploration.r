@@ -73,16 +73,66 @@
 	# sample-specific (i.e., PSU) information
 	BFISH_S = fread(paste0(proj.dir,"Data/CRF_SAMPLE.csv")) %>%
 			  .[,.(BFISH,SAMPLE_ID,PSU,SAMPLE_DATE,VESSEL,CAPTAIN_CD,OBSERVER,WIND_SPEED_KT,WAVE_HEIGHT_FT,CURRENT_CD)] %>%
-			  .[,SAMPLE_DATE:=as.POSIXct(SAMPLE_DATE,tz="HST",format=c("%Y-%m-%d"))]
+			  .[,SAMPLE_DATE:=as.POSIXct(SAMPLE_DATE,tz="HST",format=c("%Y-%m-%d"))] %>%
+			  .[,YEAR:=format(SAMPLE_DATE,format="%Y")] %>%
+			  .[,MONTH:=format(SAMPLE_DATE,format="%m")] %>%
+			  .[,DAY:=format(SAMPLE_DATE,format="%m")] %>%
+			  .[,JD:=format(SAMPLE_DATE,format="%j")] %>%
+			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366]
 	# catches (one row per individual)
 	BFISH_C = fread(paste0(proj.dir,"Data/CRF_CATCH.csv")) %>%
 			  .[,.N,by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD)] %>%
 			  .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP","ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
-			  .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"]
+			  .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"] # %>%
+			  # .[,SPECIES_GRP:="Deep7"] %>%
+			  # .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP"), SPECIES_GRP:="Other"]
 	samples_missing_bait = unique(BFISH_C[is.na(BAIT_CD)]$SAMPLE_ID)
-	# exclude samples where bait was missing for recorded fish
-	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))]
+	# exclude 15 samples where bait was missing for recorded fish
+	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))] %>%
+			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="N",fill=0,fun.aggregate=sum) %>%
+			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,APVI,SEDU,SQMI,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
 	
-	@@@@ finish formating catches
-	@@@@ merge with PSU information
-	@@@@ combine into research fishing data.table
+	# PSU specific information
+	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
+				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,Depth_MEAN_m,Depth_MAJORITY_m,Depth_MIN_m,Depth_MAX_m,Depth_STD_m,med_slp,med_acr,Depth_px_n,Slp_px_n,BS_px_nj,BS_px_over_136j,BS_pct_over_136j,pctHB,pctHS)]
+
+	research_fishing_dt = merge(BFISH_S,BFISH_D,by=c("BFISH","SAMPLE_ID")) %>%
+						  # this next line drops 17 samples with bad PSUs
+						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020)],by="PSU") %>%
+						  .[,BAIT_CD:="S"]
+	tmp_dt = copy(research_fishing_dt)
+	tmp_dt$BAIT_CD = "F"
+	research_fishing_dt = rbind(research_fishing_dt,tmp_dt) %>%
+						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID","BAIT_CD"),all=TRUE) %>%
+						  .[is.na(APRU),APRU:=0] %>%
+						  .[is.na(APVI),APVI:=0] %>%
+						  .[is.na(ETCA),ETCA:=0] %>%
+						  .[is.na(ETCO),ETCO:=0] %>%
+						  .[is.na(HYQU),HYQU:=0] %>%
+						  .[is.na(PRFI),PRFI:=0] %>%
+						  .[is.na(PRSI),PRSI:=0] %>%
+						  .[is.na(PRZO),PRZO:=0] %>%
+						  .[is.na(SEDU),SEDU:=0] %>%
+						  .[is.na(SQMI),SQMI:=0]
+	
+	# save formatted data
+		save(BFISH_D,file=paste0(proj.dir,"Data/BFISH_D.RData"))
+		save(BFISH_S,file=paste0(proj.dir,"Data/BFISH_S.RData"))
+		save(BFISH_C,file=paste0(proj.dir,"Data/BFISH_C.RData"))
+		save(PSU_table,file=paste0(proj.dir,"Data/PSU_table.RData"))
+		save(research_fishing_dt,file=paste0(proj.dir,"Data/research_fishing_dt.RData"))
+
+#_____________________________________________________________________________________________________________________________
+# plot summaries research fishing
+
+#_____________________________________________________________________________________________________________________________
+# bring in camera data
+
+#_____________________________________________________________________________________________________________________________
+# plot summaries camera data
+
+#_____________________________________________________________________________________________________________________________
+# combine research and camera data
+
+#_____________________________________________________________________________________________________________________________
+# plot summaries combined data
