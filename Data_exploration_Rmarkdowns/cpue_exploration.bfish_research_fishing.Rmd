@@ -4,7 +4,7 @@
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 setwd("D:/HOME/SAP/Code/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/")
-rmarkdown::find_pandoc(dir="C:/Users/Nicholas.Ducharme-Ba/AppData/Local/Pandoc")
+rmarkdown::find_pandoc(dir="D:/HOME/AppData/Local/Pandoc")
 rmarkdown::render("cpue_exploration.bfish_research_fishing.Rmd")
  -->
 ---
@@ -43,6 +43,56 @@ output:
 		deep8_code_vec = c("ETCA","APRU","PRSI","HYQU","PRFI","PRZO","ETCO","APVI")
 		deep8_name_vec = c("Ehu", "Lehi", "Kalekale", "Hapuupuu", "Opakapaka", "Gindai", "Onaga", "Uku")
 ```
+Research fishing makes up one of the two survey sampling gears used in the Bottomfish Fishery independent Survey in the Main Hawaiian Islands (BFISH). A standard research fishing sample was conducted at each primary sampling unit (PSU) that was allocated to the research fishing gear as a part of the stratified random sampling design process. A standard research fishing sample consisted of 30 minutes of active hook and line fishing within the PSU by one vessel using two lines. Each line was fished with four hooks and two bait types, squid and fish. More information on how this data is incorporated into the stock assessment can be found [here](https://www.fisheries.noaa.gov/species/main-hawaiian-islands-deep-7-bottomfish#overview).
+
+This document visualizes patterns in species specific catch for research fishing conducted as a part of BFISH sampling.
+
+## Catch comparison between paired baits within sample
+
+```{r warning=FALSE}
+	cols = c("SAMPLE_ID","BAIT_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("SAMPLE_ID","BAIT_CD")) %>%
+	.[,value:=value+0.25] %>%
+	dcast(.,SAMPLE_ID+variable~BAIT_CD) %>%
+	setnames(.,c("F","S"),c("Fish","Squid")) %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Catch (Fish bait)") + ylab("Catch (Squid bait)") +
+	geom_abline(slope=1, intercept=0,color="gray70") +
+    geom_jitter(aes(x = Fish, y=Squid, fill = variable),shape=21,color="black",size=1.25,width = 0.25,height=0.25) +
+    geom_smooth(aes(x = Fish, y=Squid),method='lm', formula=y~0+x,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~ variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Sample catch by species",
+         caption = "Relationship between catch on fish baited hooks vs. squid baited hooks from the same sample. \n A linear regression between the paired catch across baits is shown in black.\n The 1:1 line is shown in gray.\n Points were jittered +/- 0.25 for visibility.")
+```
+```{r warning=FALSE}
+	cols = c("SAMPLE_ID","BAIT_CD","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("SAMPLE_ID","BAIT_CD","Island")) %>%
+	.[,value:=value+0.25] %>%
+	dcast(.,SAMPLE_ID+Island+variable~BAIT_CD) %>%
+	setnames(.,c("F","S"),c("Fish","Squid")) %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() + 
+	xlab("Catch (Fish bait)") + ylab("Catch (Squid bait)") +
+	geom_abline(slope=1, intercept=0,color="gray70") +
+    geom_jitter(aes(x = Fish, y=Squid, fill = variable),shape=21,color="black",size=1.25,width = 0.25,height=0.25) +
+    geom_smooth(aes(x = Fish, y=Squid),method='lm', formula=y~0+x,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable ~ Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Sample catch by species and island group",
+         caption = "Relationship between catch on fish baited hooks vs. squid baited hooks from the same sample. \n A linear regression between the paired catch across baits is shown in black.\n The 1:1 line is shown in gray.\n Points were jittered +/- 0.25 for visibility.")
+```
+
 ## Encounter probability
 
 ```{r warning=FALSE}
@@ -50,19 +100,140 @@ output:
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
 	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
 	.[,.(value=mean(value)),by=.(YEAR,variable)] %>%
 	.[,value:=value*100] %>%
 	.[,YEAR:=as.numeric(YEAR)] %>%
 	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
 	ggplot() +
 	xlab("Year") + ylab("Encounter probability (%)") +
-    geom_path(aes(x = YEAR, y=value, color = variable),size=2) +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1.25) +
     geom_hline(yintercept = 0) +
     theme_classic(base_size = 10) +
     facet_wrap(~ variable, scales = "free") +
     scale_color_nmfs(name="Species",palette="regional web") +
     labs(title = "Encounter probability by species",
-         caption = "The percent of research fishing sets that encountered each species. \n Sets within the same sample made using squid and fish bait are counted seperately.")
+         caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
+	.[,.(value=mean(value)),by=.(YEAR,Island,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Encounter probability (%)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Encounter probability by species and island group",
+         caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r warning=FALSE}
+	cols = c("YEAR","BAIT_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
+	.[,.(value=mean(value)),by=.(YEAR,BAIT_CD,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Encounter probability (%)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_color_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Encounter probability by species and bait type",
+         caption = "The percent of research fishing sets that encountered each species.")
+```
+
+```{r warning=FALSE}
+	cols = c("YEAR","BAIT_CD","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD","Island")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
+	.[,.(value=mean(value)),by=.(YEAR,BAIT_CD,Island,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Encounter probability (%)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_color_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Encounter probability by species, bait type and island group",
+         caption = "The percent of research fishing sets that encountered each species.")
+```
+
+```{r warning=FALSE}
+	cols = c("JD","MONTH",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
+	.[,.(value=mean(value)),by=.(JD,MONTH,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Encounter probability (%)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Encounter probability by species and month",
+         caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r warning=FALSE}
+	cols = c("JD","MONTH","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH","Island")) %>%
+	.[,value:=ifelse(value>0,1,0)] %>%
+	.[,.(value=mean(value)),by=.(JD,MONTH,Island,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Encounter probability (%)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Encounter probability by species, month and island group",
+         caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
 ## Positive catch
