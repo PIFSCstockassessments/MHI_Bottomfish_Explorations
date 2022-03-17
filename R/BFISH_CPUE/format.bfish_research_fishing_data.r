@@ -100,6 +100,8 @@
 	tmp_dt$BAIT_CD = "F"
 	research_fishing_dt = rbind(research_fishing_dt,tmp_dt) %>%
 						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID","BAIT_CD"),all=TRUE) %>%
+						  # this next line drops 14 samples with missing PSUs
+						  .[!is.na(PSU)] %>%
 						  .[is.na(APRU),APRU:=0] %>%
 						  .[is.na(APVI),APVI:=0] %>%
 						  .[is.na(ETCA),ETCA:=0] %>%

@@ -20,3 +20,6 @@
   
   
   7. [Shark Depredation Investigation]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/Shark_depredation.html)
+
+
+  8. [CPUE Data Exploration - BFISH Research Fishing]( https://pifscstockassessments.github.io/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/cpue_exploration.bfish_research_fishing.html)

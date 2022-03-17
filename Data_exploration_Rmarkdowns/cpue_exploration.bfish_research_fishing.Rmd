@@ -1,10 +1,11 @@
-
-
 <!-- # Nicholas Ducharme-Barth
 # 03/15/2022
 # CPUE data exploration for BFISH research fishing data
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
+setwd("D:/HOME/SAP/Code/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/")
+rmarkdown::find_pandoc(dir="C:/Users/Nicholas.Ducharme-Ba/AppData/Local/Pandoc")
+rmarkdown::render("cpue_exploration.bfish_research_fishing.Rmd")
  -->
 ---
 title: "CPUE Data Exploration - BFISH Research Fishing"
@@ -26,6 +27,7 @@ output:
 		library(magrittr)
 		library(ggplot2)
 		library(ggthemes)
+		library(nmfspalette)
 	#_____________________________________________________________________________________________________________________________
 	# set working directory
 		proj.dir = "D:/HOME/SAP/2024_Deep7/"
@@ -35,4 +37,34 @@ output:
 		# plot_dir = "D:/HOME/SAP/Code/MHI_Bottomfish_2023/Data_exploration_Rmarkdowns/BFISH_CPUE/")
 		# dir.create(plot_dir,recursive=TRUE,showWarnings=FALSE)
 
+	#_____________________________________________________________________________________________________________________________
+	# bring in data
+		load(paste0(proj.dir,"Data/research_fishing_dt.RData"))
+		deep8_code_vec = c("ETCA","APRU","PRSI","HYQU","PRFI","PRZO","ETCO","APVI")
+		deep8_name_vec = c("Ehu", "Lehi", "Kalekale", "Hapuupuu", "Opakapaka", "Gindai", "Onaga", "Uku")
 ```
+## Encounter probability
+
+```{r warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[,.(value=mean(value)),by=.(YEAR,variable)] %>%
+	.[,value:=value*100] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Year") + ylab("Encounter probability (%)") +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=2) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~ variable, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Encounter probability by species",
+         caption = "The percent of research fishing sets that encountered each species. \n Sets within the same sample made using squid and fish bait are counted seperately.")
+```
+
+## Positive catch
+
+## Nominal CPUE
