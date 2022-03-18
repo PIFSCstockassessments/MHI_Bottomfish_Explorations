@@ -197,7 +197,7 @@ if(CPUE.plot==TRUE){
   # Run rest of code  
   cat("  
       # Process variance prior
-      isigma2.est ~ dgamma(0.001,0.001)
+      isigma2.est ~ dgamma(0.2,0.1)
       
       
       # Priors and constraints
@@ -572,10 +572,18 @@ stI = ifelse(proc.dev.all==TRUE,1, c(1:n.years)[is.na(apply(CPUE,1,mean,na.rm=TR
 
 
 # Initial starting values
-inits <- function(){list(K= rlnorm(1,log.K,0.3),q = runif(nq,0.005,0.5), isigma2.est=runif(1,20,100), itau2=runif(nvar,80,200))}
+inits <- function(){list(K= rlnorm(1,log.K,0.3),
+                         q = c(runif(nq-1,0.005,0.5),NA), 
+                         isigma2.est=runif(1,20,100), 
+                         itau2=runif(nvar,80,200),
+                         rad = runif(1, 10, 60))}
 # starting value option
 if(init.values==TRUE){
-inits <- function(){list(K= K.init,r=r.init,q = q.init, isigma2.est=runif(1,20,100), itau2=runif(nvar,80,200))}
+inits <- function(){list(K= K.init,
+                         r=r.init,
+                         q = q.init, 
+                         isigma2.est=runif(1,20,100), 
+                         itau2=runif(nvar,80,200))}
 }
 
 # JABBA input data 
@@ -587,7 +595,7 @@ surplus.dat = list(N=n.years,
                    r.pr=r.pr,
                    psi.pr=psi.pr,
                    K.pr = K.pr,
-                   nq=nq,
+                   #nq=nq,
                    nI = nI,
                    nvar=nvar,
                    sigma.fixed=ifelse(sigma.proc==TRUE,0,sigma.proc),
@@ -609,7 +617,9 @@ surplus.dat = list(N=n.years,
                    q_bounds=q_bounds,
                    sigmaobs_bound=sigmaobs_bound,
                    sigmaproc_bound=sigmaproc_bound,
-                   K_bounds=K_bounds)
+                   K_bounds=K_bounds,
+                   target_rad_mean = target_rad_mean,
+                   CV_rad = CV_rad)
 # If shape parameter is estimated (Model =4)
 if(Model==4){
   surplus.dat$m.CV = shape.CV }
@@ -639,7 +649,8 @@ params <- c("K",
             "prP",
             "prBtoBmsy",
             "prHtoHmsy",
-            "TOE")
+            "TOE", 
+            "rad")
 
 
 cat(paste0("\n","><> RUN ",Mod.names," model for ",assessment," ",Scenario," in JAGS <><","\n","\n"))
@@ -653,11 +664,23 @@ cat("
     # Prior specifications  
     eps <- 0.0000000000000000000000000000000001 # small constant    
     
+    
+    ### BFISH Effective Sampling Area Radius Prior
+    rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
+    rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
+    rad ~ dlnorm(rad_mean, rad_precision)
+    
+    
     #Catchability coefficients
-    for(i in 1:nq)
-    {   
-    q[i] ~ dunif(q_bounds[1],q_bounds[2])    
-    }  
+   
+    q[1] ~ dunif(q_bounds[1],q_bounds[2]) 
+    q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
+    q[3] <- 250000/(rad*rad*3.14159)
+   
+    # for(i in 1:nq-1)
+    # {   
+    # q[i] ~ dunif(q_bounds[1],q_bounds[2])    
+    # }  
     
     
     ")
@@ -876,7 +899,7 @@ sink()
 
 ptm <- proc.time()
 
-mod <- jags(surplus.dat, inits,params,paste(JABBA), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb)  # adapt is burn-in
+mod <- jags(surplus.dat, inits, params, paste(JABBA), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb)  # adapt is burn-in
 
 proc.time() - ptm
 save.time = proc.time() - ptm

@@ -5,11 +5,23 @@
     # Prior specifications  
     eps <- 0.0000000000000000000000000000000001 # small constant    
     
+    
+    ### BFISH Effective Sampling Area Radius Prior
+    rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
+    rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
+    rad ~ dlnorm(rad_mean, rad_precision)
+    
+    
     #Catchability coefficients
-    for(i in 1:nq)
-    {   
-    q[i] ~ dunif(q_bounds[1],q_bounds[2])    
-    }  
+   
+    q[1] ~ dunif(q_bounds[1],q_bounds[2]) 
+    q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
+    q[3] <- 250000/(rad*rad*3.14159)
+   
+    # for(i in 1:nq-1)
+    # {   
+    # q[i] ~ dunif(q_bounds[1],q_bounds[2])    
+    # }  
     
     
      

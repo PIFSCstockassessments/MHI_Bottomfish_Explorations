@@ -39,7 +39,7 @@
         }}
           
       # Process variance prior
-      isigma2.est ~ dgamma(0.001,0.001)
+      isigma2.est ~ dgamma(0.2,0.1)
       
       
       # Priors and constraints

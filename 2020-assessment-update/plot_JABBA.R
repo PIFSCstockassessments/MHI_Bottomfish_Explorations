@@ -675,6 +675,7 @@ if(SP.plot=="phase"){
   green.y = c(Bmsy.sp,0,0,max(SP),max(Cmsy))
   red.x = c(0,0,Bmsy.sp,Bmsy.sp,0)
   red.y = c(K.sp,0,max(SP),K.sp,K.sp)
+  Catch = rowSums(Catch)
   plot(Bit,SP,type = "n",ylim=c(0,max(c(max(Catch,na.rm=T)*1.05,max(MSY*1.1)))),xlim=c(0,max(Bit,B)),ylab=paste0("Surplus Production ",catch.metric),xlab="Biomass (t)",xaxs="i",yaxs="i")
   rect(0,0,K.sp*1.1,K.sp*1.1,col="green",border=0)
   rect(0,0,K.sp,K.sp,col="yellow",border=0)

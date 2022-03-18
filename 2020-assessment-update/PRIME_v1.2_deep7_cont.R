@@ -41,7 +41,7 @@ Biplot <- TRUE # Produces a "post-modern" biplot with buffer and target zones (Q
 SP.plot <- c("standard", "phase")[2] # Produces standard or 'Kobe phase' SP plot
 save.trajectories <- TRUE # saves posteriors of P=B/K, B/Bmsy and H/Hmsy as .RData object
 harvest.label <- c("Hmsy", "Fmsy")[1] # choose label preference H/Hmsy versus Fmsy
-CPUE.plot <- TRUE # Runs state-tool to produce "aligned" multi-CPUE plot
+CPUE.plot <- FALSE # Runs state-tool to produce "aligned" multi-CPUE plot
 meanCPUE <- FALSE # Uses averaged CPUE from state-space tool instead of individual indices
 Projection <- FALSE # Use Projections: requires to define TACs vectors
 save.projections <- FALSE # saves projection posteriors as .RData object
@@ -56,11 +56,11 @@ save.all <- TRUE # (if TRUE, a very large R object of entire posterior is saved)
 # Optional: Note Scenarios
 #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>
 # Specify Scenario name for output file names
-Scenarios <- c("Cont", NA, NA, NA)
+Scenarios <- c("Cont", "Cont_fox")
 
 # Execute multiple JABBA runs in loop
 
-for (s in 1:1) {
+for (s in 1:length(Scenarios)) {
   Scenario <- Scenarios[s]
 
   #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>
@@ -73,7 +73,7 @@ for (s in 1:1) {
   # 3: Pella-Tomlinsson
   # 4: Pella-Tomlinsson M
 
-  Model <- c(1, 1, 1, 1)[s]
+  Model <- c(1, 2, 1, 1)[s]
   Mod.names <- c("Schaefer", "Fox", "Pella", "Pella_m")[Model]
 
   # Depensation opiton:
@@ -170,6 +170,14 @@ for (s in 1:1) {
   r.dist <- c("lnorm", "range")[1]
   #  r.prior = c(0.2735,0.3)
   r.prior <- c(0.10, sqrt(log(1 + 0.25^2))) # needs to be sd on log-scale
+  
+  
+  #----------------------------------------------------
+  # Determine radius prior for effective sampling area of BFISH survey
+  #----------------------------------------------------
+  target_rad_mean  <- 27.6
+  CV_rad <- 0.5
+  
   #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>>
   # Observation  Error
   #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>>
@@ -196,7 +204,7 @@ for (s in 1:1) {
   proc.dev.all <- TRUE
   #------------------------------------------
   if (sigma.proc == TRUE) {
-    igamma <- c(2, 0.1) # specify inv-gamma parameters  WAS 4,0.01
+    igamma <- c(0.2, 0.1) # specify inv-gamma parameters  WAS 4,0.01
 
     # Process error check
     gamma.check <- 1 / rgamma(1000, igamma[1], igamma[2])
