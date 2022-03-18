@@ -432,6 +432,16 @@ if(K.dist=="range"){
 }
 
 
+#----------------------------------------------------
+# Prepare radius prior
+#----------------------------------------------------
+
+if(!is.null(target_rad_mean)){
+  log.rad = log(target_rad_mean)
+  CV.rad = CV_rad
+  sd.rad = sqrt(log(CV.rad^2+1))
+}
+
 #----------------------------------------------------------
 # Get JABBA parameterization and suplus production function
 #----------------------------------------------------------
@@ -479,6 +489,8 @@ if(psi.dist=="beta"){
 
 r.pr = plot_lnorm(mu=exp(log.r),CV=CV.r,Prior="r")
 mtext(paste("Density"), side=2, outer=TRUE, at=0.5,line=1,cex=0.9)
+
+rad.rp = plot_lnorm(mu = log(target_rad_mean), CV_rad)
 dev.off() 
 
 
@@ -568,12 +580,12 @@ slope.HS = ifelse(Plim==0,1/10^-10,1/Plim)
 
 nSel = 1 # setup for JABBA-SELECT version (in prep)
 nI = ncol(CPUE) # number of CPUE series
-stI = ifelse(proc.dev.all==TRUE,1, c(1:n.years)[is.na(apply(CPUE,1,mean,na.rm=TRUE))==FALSE][1]) #first year with CPUE
+stI = ifelse(proc.dev.all == TRUE, 1, c(1:n.years)[is.na(apply(CPUE,1,mean,na.rm = TRUE)) == FALSE][1]) #first year with CPUE
 
 
 # Initial starting values
 inits <- function(){list(K= rlnorm(1,log.K,0.3),
-                         q = c(runif(nq-1,0.005,0.5),NA), 
+                         q = c(runif(nq-1,0.005,0.5),NA),   # added NA for 3rd q which is the BFISH survey catchability since it is not stochastic
                          isigma2.est=runif(1,20,100), 
                          itau2=runif(nvar,80,200),
                          rad = runif(1, 10, 60))}
@@ -595,7 +607,7 @@ surplus.dat = list(N=n.years,
                    r.pr=r.pr,
                    psi.pr=psi.pr,
                    K.pr = K.pr,
-                   #nq=nq,
+                   #nq=nq,   #removed because not using a for-loop for q priors anymore
                    nI = nI,
                    nvar=nvar,
                    sigma.fixed=ifelse(sigma.proc==TRUE,0,sigma.proc),
@@ -618,8 +630,9 @@ surplus.dat = list(N=n.years,
                    sigmaobs_bound=sigmaobs_bound,
                    sigmaproc_bound=sigmaproc_bound,
                    K_bounds=K_bounds,
-                   target_rad_mean = target_rad_mean,
-                   CV_rad = CV_rad)
+                   target_rad_mean = target_rad_mean, #the target mean radius value used from prior BUGS model
+                   CV_rad = CV_rad   # CV of 50% based on prior model
+                   )
 # If shape parameter is estimated (Model =4)
 if(Model==4){
   surplus.dat$m.CV = shape.CV }
@@ -666,9 +679,10 @@ cat("
     
     
     ### BFISH Effective Sampling Area Radius Prior
-    rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
-    rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
-    rad ~ dlnorm(rad_mean, rad_precision)
+    #rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
+    #rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
+    #rad ~ dlnorm(rad_mean, rad_precision)
+    rad ~ dlnorm(rad.rp[1], pow(rad.rp[2],-2))
     
     
     #Catchability coefficients
@@ -677,6 +691,7 @@ cat("
     q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
     q[3] <- 250000/(rad*rad*3.14159)
    
+   ## removed for loop for q priors because having a deterministic q was causing problems 
     # for(i in 1:nq-1)
     # {   
     # q[i] ~ dunif(q_bounds[1],q_bounds[2])    
@@ -899,7 +914,14 @@ sink()
 
 ptm <- proc.time()
 
-mod <- jags(surplus.dat, inits, params, paste(JABBA), n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb)  # adapt is burn-in
+mod <- jags(surplus.dat, 
+            inits, 
+            params, 
+            paste(JABBA), 
+            n.chains = nc, 
+            n.thin = nt, 
+            ni = ni, 
+            n.burnin = nb)  # adapt is burn-in
 
 proc.time() - ptm
 save.time = proc.time() - ptm
@@ -920,84 +942,105 @@ output.dir = paste0(File,"/",assessment,"/",Scenario,"_",Mod.names,"/Output")
 dir.create(output.dir, showWarnings = FALSE)
 
 # run some mcmc convergence tests
-par.dat= data.frame(posteriors[params[c(1:7)]])
-geweke = geweke.diag(data.frame(par.dat))
+par.dat <- data.frame(posteriors[params[c(1:7,21)]])  #added radius paramater to outputs
+geweke <- geweke.diag(data.frame(par.dat))
 pvalues <- 2*pnorm(-abs(geweke$z))
 
-heidle = heidel.diag(data.frame(par.dat))
+heidle <- heidel.diag(data.frame(par.dat))
 
 # postrior means + 95% BCIs
 #Model  parameter
 apply(par.dat,2,quantile,c(0.025,0.5,0.975))
 
-man.dat = data.frame(posteriors[params[8:10]])
+man.dat <- data.frame(posteriors[params[8:10]])
 #Management quantaties
 apply(man.dat,2,quantile,c(0.025,0.5,0.975))
 
 # Depletion
-Depletion = posteriors$P[,c(1,n.years)]
-colnames(Depletion) = c(paste0("P",years[1]),paste0("P",years[n.years]))
+Depletion <- posteriors$P[,c(1,n.years)]
+colnames(Depletion) <- c(paste0("P", years[1]), paste0("P", years[n.years]))
 
 # Current stock status (Kobe posterior)
-H_Hmsy.cur = posteriors$HtoHmsy[,c(n.years)]
-B_Bmsy.cur = posteriors$BtoBmsy[,c(n.years)]
+H_Hmsy.cur <- posteriors$HtoHmsy[, c(n.years)]
+B_Bmsy.cur <- posteriors$BtoBmsy[, c(n.years)]
 
 
 # Prepare posterior quantaties
-man.dat = data.frame(man.dat,Depletion,B_Bmsy.cur,H_Hmsy.cur)
+man.dat <- data.frame(man.dat, Depletion, B_Bmsy.cur, H_Hmsy.cur)
 
-results = round(t(cbind(apply(par.dat,2,quantile,c(0.025,0.5,0.975)))),6)
-results.mean = round(cbind(apply(par.dat, 2, mean)),6)
-results = data.frame(Median = results[,2],LCI=results[,1],UCI=results[,3],Geweke.p=round(pvalues,3),Heidel.p = round(heidle[,3],3), Mean = results.mean[,1])
+results <- round(t(cbind(apply(par.dat, 2, quantile, c(0.025, 0.5, 0.975)))), 6)
 
-ref.points = round(t(cbind(apply(man.dat,2,quantile,c(0.025,0.5,0.975)))),3)
+results.mean <- round(cbind(apply(par.dat, 2, mean)), 6)
 
-ref.points = data.frame(Median = ref.points[,2],LCI=ref.points[,1],UCI=ref.points[,3])
+results <- data.frame(Median = results[, 2], 
+                      LCI = results[, 1], 
+                      UCI = results[, 3], 
+                      Geweke.p = round(pvalues, 3), 
+                      Heidel.p = round(heidle[, 3], 3), 
+                      Mean = results.mean[, 1])
+
+ref.points <- round(t(cbind(apply(man.dat, 2, quantile, c(0.025, 0.5, 0.975)))), 3)
+
+ref.points <- data.frame(Median = ref.points[, 2], 
+                         LCI = ref.points[, 1], 
+                         UCI = ref.points[, 3])
 
 # get number of parameters
-npar = length(par.dat)
+npar <- length(par.dat)
 # number of years
-N=n.years
+N <- n.years
 
 # Save posteriors (Produces large object!)
-if(save.all==TRUE) save(posteriors,file=paste0(output.dir,"/",Scenario,"_posteriors"))
+if (save.all == TRUE){
+  
+  save(posteriors, file = paste0(output.dir, "/", Scenario, "_posteriors"))
+
+  }
 
 #-------------------------------------------------------------------------
 # Save parameters, results table and current status posterior in csv files
 #-------------------------------------------------------------------------
 
 # Save model estimates and convergence p-values
-write.csv(data.frame(results),paste0(output.dir,"/Estimates_",assessment,"_",Scenario,".csv"))
+write.csv(data.frame(results), paste0(output.dir, "/Estimates_", assessment, "_", Scenario, ".csv"))
+
+
+############## THIS SECTION SEEMS SUSPECT. ITS CHANGING THE NAME OF q.2 TO SIGMA.PROC WHICH DOESN'T SEEM CORRECT. COMMENTING OUT FOR NOW. WILL CHECK WITH FELILPE OR JOHN. 3/18/2022 ##############################################
 
 # Make standard results table with parameter estimates and reference points
-Table = rbind(data.frame(results)[,1:3],data.frame(ref.points))  
-Table[4,] = round(sqrt((Table[4,])),3) 
-rownames(Table)[4] = "sigma.proc"
-write.csv(Table,paste0(output.dir,"/Results_",assessment,"_",Scenario,".csv"))
-#Save posterior of recent assessment year (KOBE posterior)
-write.csv(data.frame(BtoBmsy=B_Bmsy.cur,FtoFmsy=H_Hmsy.cur),paste0(output.dir,"/Status_posterior",assessment,".csv"))  
+# Table <- rbind(data.frame(results)[, 1:3], data.frame(ref.points))
+# 
+# Table[4, ] <- round(sqrt((Table[4, ])), 3)
+# 
+# rownames(Table)[4] <- "sigma.proc"
+# 
+# write.csv(Table, paste0(output.dir, "/Results_", assessment, "_", Scenario, ".csv"))
+################################################################################################################
+
+# Save posterior of recent assessment year (KOBE posterior)
+write.csv(data.frame(BtoBmsy = B_Bmsy.cur, 
+                     FtoFmsy = H_Hmsy.cur), 
+          paste0(output.dir, "/Status_posterior", assessment, ".csv"))
 
 ## source all plotting scripts
-source(paste0(JABBA.file,'/plot_JABBA.R'))
+source(paste0(JABBA.file, "/plot_JABBA.R"))
 
 
-if(save.trajectories==TRUE){
-  cat(paste0("\n","><> Saving Posteriors of FRP trajectories <><","\n"))
-  
+if (save.trajectories == TRUE) {
+  cat(paste0("\n", "><> Saving Posteriors of FRP trajectories <><", "\n"))
+
   # FRP trajectories
-  trajectories = array(NA,c(nsaved,n.years,3))
-  trajectories[,,1] = posteriors$P 
-  trajectories[,,2] = posteriors$BtoBmsy 
-  trajectories[,,3] = posteriors$HtoHmsy
-  
-  
-  kb=kobeJabba(trajectories,years[1])
-  save(kb,file=paste0(output.dir,"/",Scenario,"_trajectories"))
-  
+  trajectories <- array(NA, c(nsaved, n.years, 3))
+  trajectories[, , 1] <- posteriors$P
+  trajectories[, , 2] <- posteriors$BtoBmsy
+  trajectories[, , 3] <- posteriors$HtoHmsy
+
+
+  kb <- kobeJabba(trajectories, years[1])
+  save(kb, file = paste0(output.dir, "/", Scenario, "_trajectories"))
 }
 
-cat(paste0("\n","><> Scenario ",Mod.names,"_",Scenario," for ",assessment," - DONE! <><","\n"))
-
+cat(paste0("\n", "><> Scenario ", Mod.names, "_", Scenario, " for ", assessment, " - DONE! <><", "\n"))
 
 
 
