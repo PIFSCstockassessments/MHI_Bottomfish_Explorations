@@ -10,6 +10,8 @@
 # load packages
 	library(data.table)
 	library(magrittr)
+	library(suncalc)
+
 
 #_____________________________________________________________________________________________________________________________
 # set working directory
@@ -74,7 +76,9 @@
 			  .[,MONTH:=format(SAMPLE_DATE,format="%m")] %>%
 			  .[,DAY:=format(SAMPLE_DATE,format="%m")] %>%
 			  .[,JD:=format(SAMPLE_DATE,format="%j")] %>%
-			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366]
+			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366] %>%
+			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction]
+
 	# catches (one row per individual)
 	BFISH_C = fread(paste0(proj.dir,"Data/CRF_CATCH.csv")) %>%
 			  .[,.N,by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD)] %>%
