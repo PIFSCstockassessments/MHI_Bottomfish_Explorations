@@ -3,6 +3,9 @@
 ## M Oshima 2022
 
 library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
 
 ## some preset variables
 sex.ratio <- 1 # sex ratio of female crabs, set to = 1 if no sex ratio
@@ -11,6 +14,8 @@ natM <- 0.3 ## used in kobe
 UCR <- 0.68 ## scalar for unreported catch to reported catch in final years, default 0
 ## calculated by mean(c(.59,.28,1.97,0.25,0.05,1.0,.61)) values taken from Table 3 of 2018 Deep 7 Report
 
+
+node_id <- names(out)
 
 ## PLOT TOTAL LANDINGS ----
 cat("\n", "-Plotting Total Landings", "\n")
@@ -59,14 +64,6 @@ Par <- list(mfrow = c(round(length(node_id) / 3 + 0.33, 0), 3),
             omi = c(0.3, 0.5, 0.1, 0) + 0.1, 
             mgp = c(1, 0.1, 0),
             tck = -0.02, cex = 0.8)
-png(
-  file = paste0(output.dir, "/Fig9_Posteriors_", assessment, "_", Scenario, ".png"), 
-  width = 8, 
-  height = 2.5 * round(length(node_id) / 3, 0),
-  res = 720, units = "in"
-)
-
-par(Par)
 
 
 kk <- rlnorm(nrow(out), log(K.pr[1]), K.pr[2])
@@ -83,8 +80,8 @@ ppsi <- if(psi.dist == "beta"){
   }
 qq1 <- rep(0, nrow(out))
 qq2 <- rep(0, nrow(out))
-qq3 <- rep(0, nrow(out))
-ss2 <- 1 / rgamma(nrow(out), igamma[1], igamma[2])
+qq3 <- rep(250000/(target_rad_mean*target_rad_mean*3.14159), nrow(out)) 
+ss2 <- 1/rgamma(nrow(out), 4, 0.01)
 rrad <- rlnorm(nrow(out), rad.rp[1], rad.rp[2])
 
 params_plot_df <- data.frame(
@@ -115,34 +112,72 @@ params_plot_df <- data.frame(
                       out$rad,
                       ss2,
                       out$sigma2),
-            Type = rep(rep(c("Prior", "Posterior"), each = (nrow(out))), each = ncol(out))) #nested rep functions each = nrow(out), each = ncol(out)
+            Type = rep(rep(c("Prior", "Posterior"), each = (nrow(out))), ncol(out))) #nested rep functions each = nrow(out), each = ncol(out)
 
-  params_plot_df %>% 
+## Create a dataframe of xlimits for each parameter-type combo to specifiy for facet_wrap
+# axis.lims <- params_plot_df %>% 
+#   group_by(parameter, Type) %>% 
+#   summarise(xmin = quantile(Value, 0.0001),
+#             xmax = quantile(Value, 0.95)) 
+#   pivot_longer(cols = c("xmin", "xmax"), values_to = "xlimits") %>% 
+#   mutate(ylimits = 0)
+#   
+png(
+  file = paste0(output.dir, "/Posteriors_", assessment, "_", Scenario, ".png"), 
+  width = 8, 
+  height = 2.5 * round(length(node_id) / 3, 0),
+  res = 720, units = "in"
+)
+
+par(Par)
+
+
+params_plot_df %>% 
     ggplot(aes(x = Value, fill = Type)) +
     geom_density(alpha = 0.7) + 
     facet_wrap(~ parameter, scales = "free") +
     scale_fill_manual(name = "Type", 
-                       values = c("Posterior" = "gray80",
-                                  "Prior" = "gray30")) +
+                       values = c("Prior" = "gray30",
+                                  "Posterior" = "gray80")) +
+    
     labs(x = "", y = "Density") +
     theme_classic()
     
-  
+dev.off()
 
 ## PLOT MCMC CHAINS ----
 cat(paste0("\n", "-Plotting MCMC Chains", "\n"))
-Par <- list(mfrow = c(round(length(node_id) / 3 + 0.33, 0), 3), mai = c(0.4, 0.1, 0, .1), omi = c(0.3, 0.5, 0.1, 0) + 0.1, mgp = c(1, 0.1, 0), tck = -0.02, cex = 0.8)
+
 png(
   file = paste0(output.dir, "/MCMC_", assessment, "_", Scenario, ".png"), width = 8, height = 2.5 * round(length(node_id) / 3, 0),
   res = 720, units = "in"
 )
+
 par(Par)
-for (i in 1:length(node_id)) {
-  post.par <- as.numeric(unlist(out[paste(node_id[i])]))
-  plot(out[, i], xlab = paste(node_id[i]), ylab = "", type = "l", col = 4)
-  lines(rep(mean(out[, i]), length(out[, i])), col = 2, lwd = 2)
-}
+
+param.means <- out %>% 
+  mutate(it = seq(1, nrow(out))) %>% 
+  pivot_longer(-it,
+               names_to = "Parameter",
+               values_to = "Value") %>% 
+  group_by(Parameter) %>% 
+  summarise(mean = mean(Value))
+
+
+out %>% 
+  mutate(it = seq(1, nrow(out))) %>% 
+  pivot_longer(-it,
+               names_to = "Parameter",
+               values_to = "Value") %>% 
+  group_by(Parameter) %>%
+  ggplot(aes(x = it, y = Value)) +
+  geom_line(color = 4) +
+  geom_hline(data = param.means, aes(yintercept = mean), color = 2) +
+  facet_wrap(~Parameter, scales = "free") + 
+  theme_classic()
+
 dev.off()
+
 
 ## MK PLOT CPUE FITS ----
 cat(paste0("\n", "-Plotting CPUE Fits", "\n"))
@@ -169,7 +204,7 @@ png(
   units = "in"
 )
 par(Par)
-for (i in 1:n.indices) {
+for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
 
   # set observed vs predicted CPUE
   # par(mfrow=c(1,1))

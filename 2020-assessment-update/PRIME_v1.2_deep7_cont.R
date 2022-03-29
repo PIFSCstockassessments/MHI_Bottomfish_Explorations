@@ -204,7 +204,7 @@ for (s in 1:length(Scenarios)) {
   proc.dev.all <- TRUE
   #------------------------------------------
   if (sigma.proc == TRUE) {
-    igamma <- c(0.2, 0.1) # specify inv-gamma parameters  WAS 4,0.01
+    igamma <- c(4, 0.01) # specify inv-gamma parameters  WAS 0.2,0.1
 
     # Process error check
     gamma.check <- 1 / rgamma(1000, igamma[1], igamma[2])

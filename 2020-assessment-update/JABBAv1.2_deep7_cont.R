@@ -233,7 +233,14 @@ if(CPUE.plot==TRUE){
   mSE2 = as.matrix(se2[q1.y:n.years,qs])
   if(n.indices>1) for(i in 2:n.indices){q.init[i] = mean(mCPUE[,i],na.rm=TRUE)/mean(mCPUE[,1],na.rm=TRUE)}
   # Bundle data
-  jags.data <- list(y = log(mCPUE),SE2=mSE2, logY1 = log(mCPUE[1,1]), N = length(q1.y:n.years),nI=n.indices,sigma.fixed=ifelse(sigma.proc==TRUE,0,sigma.proc))
+  jags.data <- list(
+    y = log(mCPUE),
+    SE2=mSE2, 
+    logY1 = log(mCPUE[1,1]),
+    N = length(q1.y:n.years),
+    nI=n.indices,
+    sigma.fixed=ifelse(sigma.proc==TRUE,0,sigma.proc)
+    )
   
   # Initial values
   inits <- function(){list(isigma2.est=runif(1,20,100), itau2=runif(1,80,200), mean.r = rnorm(1),iq = 1/q.init)}
@@ -490,7 +497,7 @@ if(psi.dist=="beta"){
 r.pr = plot_lnorm(mu=exp(log.r),CV=CV.r,Prior="r")
 mtext(paste("Density"), side=2, outer=TRUE, at=0.5,line=1,cex=0.9)
 
-rad.rp = plot_lnorm(mu = log(target_rad_mean), CV_rad)
+rad.pr = plot_lnorm(mu = log(target_rad_mean), CV_rad, Prior = "Radius")
 dev.off() 
 
 
@@ -599,40 +606,42 @@ inits <- function(){list(K= K.init,
 }
 
 # JABBA input data 
-surplus.dat = list(N=n.years, 
-                   TC = TC,
-                   I=CPUE,
-                   SE2=se2,
-                   mu.m=m,
-                   r.pr=r.pr,
-                   psi.pr=psi.pr,
-                   K.pr = K.pr,
-                   #nq=nq,   #removed because not using a for-loop for q priors anymore
-                   nI = nI,
-                   nvar=nvar,
-                   sigma.fixed=ifelse(sigma.proc==TRUE,0,sigma.proc),
-                   sets.var=sets.var, 
-                   sets.q=sets.q,
-                   pen.bk = rep(0,n.years),
-                   Plim=Plim,
-                   slope.HS=slope.HS,
-                   nTAC=nTAC,
-                   pyrs=pyrs,
-                   TAC=TAC,
-                   igamma = igamma,
-                   stI=stI,
-                   TACint =TACint,
-                   P_bound=P_bound,
-                   proc.pen=0,
-                   K.pen = 0,
-                   obs.pen = rep(0,nvar),
-                   q_bounds=q_bounds,
-                   sigmaobs_bound=sigmaobs_bound,
-                   sigmaproc_bound=sigmaproc_bound,
-                   K_bounds=K_bounds,
-                   target_rad_mean = target_rad_mean, #the target mean radius value used from prior BUGS model
-                   CV_rad = CV_rad   # CV of 50% based on prior model
-                   )
+surplus.dat <- list(
+  N = n.years,
+  TC = TC,
+  I = CPUE,
+  SE2 = se2,
+  mu.m = m,
+  r.pr = r.pr,
+  psi.pr = psi.pr,
+  K.pr = K.pr,
+  rad.pr = rad.pr,
+  # nq=nq,   #removed because not using a for-loop for q priors anymore
+  nI = nI,
+  nvar = nvar,
+  sigma.fixed = ifelse(sigma.proc == TRUE, 0, sigma.proc),
+  sets.var = sets.var,
+  sets.q = sets.q,
+  pen.bk = rep(0, n.years),
+  Plim = Plim,
+  slope.HS = slope.HS,
+  nTAC = nTAC,
+  pyrs = pyrs,
+  TAC = TAC,
+  igamma = igamma,
+  stI = stI,
+  TACint = TACint,
+  P_bound = P_bound,
+  proc.pen = 0,
+  K.pen = 0,
+  obs.pen = rep(0, nvar),
+  q_bounds = q_bounds,
+  sigmaobs_bound = sigmaobs_bound,
+  sigmaproc_bound = sigmaproc_bound,
+  K_bounds = K_bounds,
+  #target_rad_mean = target_rad_mean, # the target mean radius value used from prior BUGS model
+  CV_rad = CV_rad # CV of 50% based on prior model
+)
 # If shape parameter is estimated (Model =4)
 if(Model==4){
   surplus.dat$m.CV = shape.CV }
@@ -682,7 +691,7 @@ cat("
     #rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
     #rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
     #rad ~ dlnorm(rad_mean, rad_precision)
-    rad ~ dlnorm(rad.rp[1], pow(rad.rp[2],-2))
+    rad ~ dlnorm(rad.pr[1], pow(rad.pr[2],-2))
     
     
     #Catchability coefficients
@@ -920,7 +929,7 @@ mod <- jags(surplus.dat,
             paste(JABBA), 
             n.chains = nc, 
             n.thin = nt, 
-            ni = ni, 
+            n.iter = ni, 
             n.burnin = nb)  # adapt is burn-in
 
 proc.time() - ptm
@@ -932,8 +941,6 @@ cat(paste0("\n","><> Produce results output of ",Mod.names," model for ",assessm
 
 # if run with library(rjags)
 posteriors = mod$BUGSoutput$sims.list
-
-
 
 #-----------------------------------------------------------
 # <><<><<><<><<><<><<>< Outputs ><>><>><>><>><>><>><>><>><>

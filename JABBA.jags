@@ -7,9 +7,10 @@
     
     
     ### BFISH Effective Sampling Area Radius Prior
-    rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
-    rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
-    rad ~ dlnorm(rad_mean, rad_precision)
+    #rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
+    #rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
+    #rad ~ dlnorm(rad_mean, rad_precision)
+    rad ~ dlnorm(rad.pr[1], pow(rad.pr[2],-2))
     
     
     #Catchability coefficients
@@ -18,6 +19,7 @@
     q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
     q[3] <- 250000/(rad*rad*3.14159)
    
+   ## removed for loop for q priors because having a deterministic q was causing problems 
     # for(i in 1:nq-1)
     # {   
     # q[i] ~ dunif(q_bounds[1],q_bounds[2])    
