@@ -638,9 +638,9 @@ surplus.dat <- list(
   q_bounds = q_bounds,
   sigmaobs_bound = sigmaobs_bound,
   sigmaproc_bound = sigmaproc_bound,
-  K_bounds = K_bounds,
+  K_bounds = K_bounds
   #target_rad_mean = target_rad_mean, # the target mean radius value used from prior BUGS model
-  CV_rad = CV_rad # CV of 50% based on prior model
+  #CV_rad = CV_rad # CV of 50% based on prior model
 )
 # If shape parameter is estimated (Model =4)
 if(Model==4){

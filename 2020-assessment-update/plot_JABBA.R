@@ -1,5 +1,5 @@
 ## Plots for 2023 Deep 7 Benchmark Assessment
-## These include some default and modified JABBA outputs.\
+## These include some default and modified JABBA outputs converted to ggplot
 ## M Oshima 2022
 
 library(dplyr)
@@ -19,30 +19,21 @@ node_id <- names(out)
 
 ## PLOT TOTAL LANDINGS ----
 cat("\n", "-Plotting Total Landings", "\n")
-Par <- list(mfrow = c(1, 1), 
-            mar = c(3.5, 3.5, 0.1, 0.1), 
-            mgp = c(2., 0.5, 0), 
-            tck = -0.02, 
-            cex = 0.8)
 
-png(
-  file = paste0(output.dir, "/Landings_", assessment, "_", Scenario, ".png"), 
-  width = 5, height = 3.5,
-  res = 720, units = "in"
-)
-
-par(Par)
-
-#cord.x <- c(years, rev(years))
-#y <- rep(0, length(years))
-
-tibble(years = years, total_catch = TC) %>% 
+landings_plot <- tibble(years = years, total_catch = TC) %>% 
   ggplot() +
   geom_ribbon(aes(x = years, ymin = 0, ymax = total_catch), fill = "gray60", color = "black") +
   labs(x = "Year", y = paste0("Catch ('", catch.metric, ")")) +
   theme_classic()
 
-dev.off()
+ggsave(filename = paste0("Landings_", assessment, "_", Scenario, ".png"), 
+       plot = landings_plot,
+       device = "png",
+       path = output.dir,
+       width = 5,
+       height = 3.5, 
+       units = "in", 
+       dpi = 780)
 
 
 
@@ -53,18 +44,7 @@ plotting.params <- c("K", "r", "m", "psi", "q", "sigma2", "rad")
 
 out <- data.frame(posteriors[which(names(posteriors) %in% plotting.params)])
 
-
-#node_id <- names(out)
-# informative priors
-Prs <- as.matrix(cbind(K.pr, r.pr, c(0, 0), psi.pr))
-
-# Posteriors
-Par <- list(mfrow = c(round(length(node_id) / 3 + 0.33, 0), 3), 
-            mai = c(0.4, 0.1, 0, .1), 
-            omi = c(0.3, 0.5, 0.1, 0) + 0.1, 
-            mgp = c(1, 0.1, 0),
-            tck = -0.02, cex = 0.8)
-
+# Priors
 
 kk <- rlnorm(nrow(out), log(K.pr[1]), K.pr[2])
 rr <- rlnorm(nrow(out), log(r.pr[1]), r.pr[2])
@@ -122,17 +102,8 @@ params_plot_df <- data.frame(
 #   pivot_longer(cols = c("xmin", "xmax"), values_to = "xlimits") %>% 
 #   mutate(ylimits = 0)
 #   
-png(
-  file = paste0(output.dir, "/Posteriors_", assessment, "_", Scenario, ".png"), 
-  width = 8, 
-  height = 2.5 * round(length(node_id) / 3, 0),
-  res = 720, units = "in"
-)
 
-par(Par)
-
-
-params_plot_df %>% 
+posteriors_plot <- params_plot_df %>% 
     ggplot(aes(x = Value, fill = Type)) +
     geom_density(alpha = 0.7) + 
     facet_wrap(~ parameter, scales = "free") +
@@ -142,18 +113,20 @@ params_plot_df %>%
     
     labs(x = "", y = "Density") +
     theme_classic()
+
+ggsave(filename = paste0("Posteriors_", assessment, "_", Scenario, ".png"), 
+       plot = posteriors_plot,
+       device = "png",
+       path = output.dir,
+       width = 8,
+       height = 7.5, 
+       units = "in", 
+       dpi = 780)
     
-dev.off()
+
 
 ## PLOT MCMC CHAINS ----
 cat(paste0("\n", "-Plotting MCMC Chains", "\n"))
-
-png(
-  file = paste0(output.dir, "/MCMC_", assessment, "_", Scenario, ".png"), width = 8, height = 2.5 * round(length(node_id) / 3, 0),
-  res = 720, units = "in"
-)
-
-par(Par)
 
 param.means <- out %>% 
   mutate(it = seq(1, nrow(out))) %>% 
@@ -164,7 +137,7 @@ param.means <- out %>%
   summarise(mean = mean(Value))
 
 
-out %>% 
+mcmc_chains_plot <- out %>% 
   mutate(it = seq(1, nrow(out))) %>% 
   pivot_longer(-it,
                names_to = "Parameter",
@@ -176,7 +149,14 @@ out %>%
   facet_wrap(~Parameter, scales = "free") + 
   theme_classic()
 
-dev.off()
+ggsave(filename = paste0("MCMC_", assessment, "_", Scenario, ".png"), 
+       plot = mcmc_chains_plot,
+       device = "png",
+       path = output.dir,
+       width = 8,
+       height = 10, 
+       units = "in", 
+       dpi = 1080)
 
 
 ## MK PLOT CPUE FITS ----
@@ -281,7 +261,7 @@ dev.off()
 ## end CPUE Fits
 
 
-## MK PLOT JABBA RESIDUALS, log ----
+## MO PLOT JABBA RESIDUALS, log ----
 cat(paste0("\n", "-Plotting CPUE Residuals", "\n"))
 ## Generate & Save Log Residuals
 Resids <- NULL
@@ -340,7 +320,7 @@ for (i in 1:n.indices) {
 
 dev.off()
 
-## MK PLOT JABBA RESIDUALS, standardized ----
+## MO PLOT JABBA RESIDUALS, standardized ----
 ## Generate & Save Std Residuals
 StResid <- NULL
 for (i in 1:n.indices) {
@@ -355,55 +335,36 @@ DF <- Nobs - npar
 DIC <- round(mod$BUGSoutput$DIC, 1)
 SDNR <- round(sqrt(sum(StResid^2, na.rm = TRUE) / (Nobs - 1)), 2)
 Crit.value <- (qchisq(.95, df = (Nobs - 1)) / (Nobs - 1))^0.5
-StRes.CPUE <- data.frame(StResid)
-row.names(Res.CPUE) <- indices
-colnames(Res.CPUE) <- paste(Yr)
-write.csv(Res.CPUE, paste0(output.dir, "/StResCPUE_", assessment, "_", Scenario, ".csv"))
+
+StRes.CPUE <- StResid %>% 
+  as.tibble() %>% 
+  mutate(index = indices) %>% 
+  pivot_longer(cols = -index, names_to = "year", values_to = "residual") %>% 
+  mutate(year = rep(years, length(indices))) 
+
+write.csv(StRes.CPUE, paste0(output.dir, "/StResCPUE_", assessment, "_", Scenario, ".csv"))
 
 ## do plot, standardized
 
-Par <- list(mfrow = c(n.indices, 1), mar = c(3.5, 3.5, 0.1, 0.1), mgp = c(2., 0.5, 0), tck = -0.02, cex = 0.8)
-png(
-  file = paste0(output.dir, "/Fig8_StdResiduals_", assessment, "_", Scenario, ".png"), width = 6, height = 10,
-  res = 1080, units = "in"
-)
-par(Par)
-for (i in 1:n.indices) {
-  tempResid <- data.frame(na.omit(cbind(Yr, t(StResid)[, i])))
-  plot(
-    Yr,
-    Yr,
-    type = "n",
-    ylim = c(min(-1, -1.2 * max(
-      abs(StResid),
-      na.rm = T
-    )), max(1, 1.2 * max(
-      abs(StResid),
-      na.rm = T
-    ))),
-    xlim = c(min(tempResid$Yr), max(tempResid$Yr)),
-    ylab = "Standardized residuals",
-    xlab = "Year"
-  )
-  abline(h = 0, lty = 2)
-  positions <- runif(n.indices, -0.2, 0.2)
+standardized_resids_plot <- StRes.CPUE %>% 
+  filter(!is.na(residual)) %>% 
+  ggplot(aes(x = year, y = residual)) +
+  geom_point(aes(color = index)) +
+  geom_segment(aes(x = year, xend = year, y = 0, yend = residual)) + 
+  geom_hline(yintercept = 0) +
+  facet_wrap(~index, scales = "free", ncol = 1) + 
+  theme_classic() +
+  labs(x = "Year", y = "Standardized Residuals") +
+  scale_color_manual(values = wink.colors[1:3,2])
 
-  for (t in 1:length(tempResid$Yr)) {
-    lines(rep((tempResid$Yr + positions[i])[t], 2), c(0, tempResid[t, "V2"]),
-      col = as.character(wink.colors[wink.colors$idx == indices[i], "cols"])
-    )
-  }
-  points(
-    tempResid$Yr + positions[i],
-    tempResid$V2,
-    col = NA,
-    pch = 21,
-    bg = as.character(wink.colors[wink.colors$idx == indices[i], "cols"])
-  )
-}
-
-dev.off()
-
+ggsave(filename = paste0("StdResiduals_", assessment, "_", Scenario, ".png"), 
+       plot = standardized_resids_plot,
+       device = "png",
+       path = output.dir,
+       width = 6,
+       height = 10, 
+       units = "in", 
+       dpi = 1080)
 
 
 
