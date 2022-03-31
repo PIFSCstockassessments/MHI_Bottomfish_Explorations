@@ -95,7 +95,7 @@ This document visualizes patterns in species specific catch for research fishing
 
 ## Encounter probability
 
-```{r warning=FALSE}
+```{r e_01, warning=FALSE}
 	cols = c("YEAR","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -116,7 +116,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_02, warning=FALSE}
 	cols = c("YEAR","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -139,7 +139,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_03, warning=FALSE}
 	cols = c("YEAR","BAIT_CD",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -162,7 +162,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species.")
 ```
 
-```{r warning=FALSE}
+```{r e_04, warning=FALSE}
 	cols = c("YEAR","BAIT_CD","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -186,7 +186,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species.")
 ```
 
-```{r warning=FALSE}
+```{r e_05, warning=FALSE}
 	cols = c("JD","MONTH",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -210,8 +210,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-
-```{r warning=FALSE}
+```{r e_06, warning=FALSE}
 	cols = c("JD","MONTH","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -235,7 +234,9 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species, month and island group.",
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+
+```{r e_07, warning=FALSE}
 	cols = c("LUNAR_PHASE",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -257,7 +258,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species and degree of lunar illumination.",
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_08, warning=FALSE}
 	cols = c("LUNAR_PHASE","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -281,7 +283,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_09, warning=FALSE}
 	cols = c("LUNAR_PHASE","JD","MONTH",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -307,7 +309,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_10, warning=FALSE}
 	cols = c("VESSEL",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -331,8 +333,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-
-```{r warning=FALSE}
+```{r e_11, warning=FALSE}
 	cols = c("Island","VESSEL",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -357,8 +358,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-
-```{r warning=FALSE}
+```{r e_12, warning=FALSE}
 	cols = c("CAPTAIN_CD",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -382,8 +382,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-
-```{r warning=FALSE}
+```{r e_13, warning=FALSE}
 	cols = c("Island","CAPTAIN_CD",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -407,7 +406,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species, island group, and Captain ID.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_14, warning=FALSE}
 	cols = c("TIME_MIN",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -431,7 +431,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species and time of day.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_15, warning=FALSE}
 	cols = c("TIME_MIN","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -456,7 +457,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species, time of day, and island group.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_16, warning=FALSE}
 	cols = c("DEPTH_M",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -481,7 +483,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_17, warning=FALSE}
 	cols = c("DEPTH_M","Island",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -506,7 +508,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species, depth, and island group.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_18, warning=FALSE}
 	cols = c("LON",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -530,7 +533,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species and longitude.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_19, warning=FALSE}
 	cols = c("Island","LON",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -555,7 +559,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species, longitude, and island group.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_20, warning=FALSE}
 	cols = c("LAT",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -580,7 +585,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_21, warning=FALSE}
 	cols = c("Island","LAT",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -606,7 +611,7 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
-```{r warning=FALSE}
+```{r e_22, warning=FALSE}
 	cols = c("STRATA",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -628,7 +633,8 @@ This document visualizes patterns in species specific catch for research fishing
     labs(title = "Encounter probability by species and survey strata.",
          caption = "The percent of research fishing sets that encountered each species. \n Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
 ```
-```{r warning=FALSE}
+
+```{r e_23, warning=FALSE}
 	cols = c("Island","STRATA",deep8_code_vec)
 	research_fishing_dt %>%
 	.[,cols,with=FALSE] %>%
@@ -653,5 +659,168 @@ This document visualizes patterns in species specific catch for research fishing
 ```
 
 ## Positive catch
+
+```{r p_01, warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Year") + ylab("Positive catch (n)") +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = variable),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~ variable, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_02, warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,Island,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = variable),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_03, warning=FALSE}
+	cols = c("YEAR","BAIT_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,BAIT_CD,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = BAIT_CD),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_color_nmfs(name="Bait type",palette="regional web") +
+    scale_fill_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Positive catch by species.")
+```
+
+
+```{r p_04, warning=FALSE}
+	cols = c("YEAR","BAIT_CD","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD","Island")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,BAIT_CD,Island,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = BAIT_CD),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+	scale_color_nmfs(name="Bait type",palette="regional web") +
+    scale_fill_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Positive catch by species, bait type, and island group.")
+```
+
+```{r p_05, warning=FALSE}
+	cols = c("JD","MONTH",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(JD,MONTH,variable)] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and month.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_06, warning=FALSE}
+	cols = c("JD","MONTH","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH","Island")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(JD,MONTH,Island,variable)] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, month, and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_07, warning=FALSE}
+	cols = c("LUNAR_PHASE",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(LUNAR_PHASE_BIN,LUNAR_PHASE,variable)] %>%
+	.[,LUNAR_PHASE_BIN:=factor(as.character(LUNAR_PHASE_BIN),levels=as.character(seq(from=0,by=0.125,to=1)))] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=as.character(c(0,0.25,0.5,0.75,1)),drop=FALSE) +
+    geom_boxplot(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and degree of lunar illumination.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
 
 ## Nominal CPUE
