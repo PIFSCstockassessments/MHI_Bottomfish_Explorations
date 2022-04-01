@@ -6,10 +6,13 @@
     eps <- 0.0000000000000000000000000000000001 # small constant    
     
     
-    ### BFISH Effective Sampling Area Radius Prior
+    ### BFISH Effective Sampling Area Radius Prior ################################
+    
     #rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
     #rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
     #rad ~ dlnorm(rad_mean, rad_precision)
+    ### rad.pr was calculated using the plot_lnorm function that was used to generate lognormal priors for K and r 
+    ### see line 502 that is why code above (which was taken from BUGS code) was omitted and replaced with line below
     rad ~ dlnorm(rad.pr[1], pow(rad.pr[2],-2))
     
     
@@ -17,7 +20,7 @@
    
     q[1] ~ dunif(q_bounds[1],q_bounds[2]) 
     q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
-    q[3] <- 250000/(rad*rad*3.14159)
+    q[3] <- a.grid/(rad*rad*3.14159)
    
    ## removed for loop for q priors because having a deterministic q was causing problems 
     # for(i in 1:nq-1)
@@ -71,6 +74,7 @@
     Pmean[1] <- log(psi)
     iPV[1] <- ifelse(1<(stI),10000,isigma2) # inverse process variance
     P[1] ~ dlnorm(Pmean[1],iPV[1]) # set to small noise instead of isigma2
+    
     penB[1]  <- ifelse(P[1]<P_bound[1],log(K*P[1])-log(K*P_bound[1]),ifelse(P[1]>P_bound[2],log(K*P[1])-log(K*P_bound[2]),0)) # penalty if Pmean is outside viable biomass
     
     # Process equation
@@ -84,6 +88,7 @@
     penB[t]  <- ifelse(P[t]<(P_bound[1]),log(K*P[t])-log(K*(P_bound[1])),ifelse(P[t]>P_bound[2],log(K*P[t])-log(K*(P_bound[2])),0)) # penalty if Pmean is outside viable biomass
     }
     
+
     # Process error deviation 
     for(t in 1:N){
     Proc.Dev[t] <- P[t]-exp(Pmean[t])} 
@@ -103,7 +108,7 @@
     
     # Observation equation in related to EB
     
-    for(i in 1:nI)
+    for(i in 1:(nI-1))
     {
     for (t in 1:N) 
     { 
@@ -112,6 +117,16 @@
     CPUE[t,i] <- q[sets.q[i]]*P[t]*K
     }}
     
+     for(i in nI){ ## added by Meg for BFISH index
+      for (t in 1:N){ 
+
+        Imean[t,i] <- log(P[t] * K/(q[sets.q[i]])*n.grid)
+        survey_precision[t] <- (s_lambda*s_lambda)/( ivar.obs[t,i])
+        I[t, i] ~ dlnorm(Imean[t,i], survey_precision[t])
+        CPUE[t,i] <- P[t]*K/(q[sets.q[i]]*n.grid)
+
+    }
+    }
     
     #Management quantities
     SBmsy_K <- (m)^(-1/(m-1))

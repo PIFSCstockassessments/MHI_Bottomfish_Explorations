@@ -56,7 +56,7 @@ save.all <- TRUE # (if TRUE, a very large R object of entire posterior is saved)
 # Optional: Note Scenarios
 #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>
 # Specify Scenario name for output file names
-Scenarios <- c("Cont", "Cont_fox")
+Scenarios <- c("Cont", "Cont_fox", "cont_pella")
 
 # Execute multiple JABBA runs in loop
 
@@ -73,7 +73,7 @@ for (s in 1:length(Scenarios)) {
   # 3: Pella-Tomlinsson
   # 4: Pella-Tomlinsson M
 
-  Model <- c(1, 2, 1, 1)[s]
+  Model <- c(1, 2, 3, 1)[s]
   Mod.names <- c("Schaefer", "Fox", "Pella", "Pella_m")[Model]
 
   # Depensation opiton:
@@ -100,6 +100,11 @@ for (s in 1:length(Scenarios)) {
   ### CPUE data
   cpue <- read.csv(paste0(File, "/", assessment, "/cpue", assessment, ".csv"))
   
+  ###Adjust BFISH Survey biomass based on BUGS Script ###
+  cpue$CPUE_3 <- (cpue$CPUE_3/1000000)*2.20462/(25892*104.4653)
+
+  s_lambda <- 1 #initial weighting on sd of survey estimate
+  
 
   if(SE.I == TRUE) {
     
@@ -108,6 +113,10 @@ for (s in 1:length(Scenarios)) {
     ## convert mean CV to log(se)
     se$CV_1 <- sqrt(log(1 + se$CV_1^2))
     se$CV_2 <- sqrt(log(1 + se$CV_2^2))
+    SE_BFISH <- (se$SE_BFISH/1000000*2.20462/(25892*104.4653))^2  
+    
+    s_CV <- sqrt(SE_BFISH)/cpue$CPUE_3
+    se$SE_BFISH <- log(s_CV*s_CV+1)
     
   }
   #######################################################
@@ -177,6 +186,8 @@ for (s in 1:length(Scenarios)) {
   #----------------------------------------------------
   target_rad_mean  <- 27.6
   CV_rad <- 0.5
+  n.grid <- 25892 # the number of sampling grids in a sampling domain
+  a.grid <- 250000 # area within a sampling grid
   
   #><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>><>>
   # Observation  Error
@@ -204,7 +215,7 @@ for (s in 1:length(Scenarios)) {
   proc.dev.all <- TRUE
   #------------------------------------------
   if (sigma.proc == TRUE) {
-    igamma <- c(4, 0.01) # specify inv-gamma parameters  WAS 0.2,0.1
+    igamma <- c(0.2, 0.1) # specify inv-gamma parameters  
 
     # Process error check
     gamma.check <- 1 / rgamma(1000, igamma[1], igamma[2])

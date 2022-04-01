@@ -6,6 +6,7 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(tibble)
 
 ## some preset variables
 sex.ratio <- 1 # sex ratio of female crabs, set to = 1 if no sex ratio
@@ -17,7 +18,7 @@ UCR <- 0.68 ## scalar for unreported catch to reported catch in final years, def
 
 node_id <- names(out)
 
-## PLOT TOTAL LANDINGS ----
+## MO PLOT TOTAL LANDINGS ----
 cat("\n", "-Plotting Total Landings", "\n")
 
 landings_plot <- tibble(years = years, total_catch = TC) %>% 
@@ -37,7 +38,7 @@ ggsave(filename = paste0("Landings_", assessment, "_", Scenario, ".png"),
 
 
 
-## PLOT POSTERIORS ----
+## MO PLOT POSTERIORS ----
 cat("\n", "-Plotting Posteriors", "\n")
 
 plotting.params <- c("K", "r", "m", "psi", "q", "sigma2", "rad")
@@ -125,7 +126,7 @@ ggsave(filename = paste0("Posteriors_", assessment, "_", Scenario, ".png"),
     
 
 
-## PLOT MCMC CHAINS ----
+## MO PLOT MCMC CHAINS ----
 cat(paste0("\n", "-Plotting MCMC Chains", "\n"))
 
 param.means <- out %>% 
@@ -169,7 +170,7 @@ check.yrs <- apply(CPUE, 1, sum, na.rm = TRUE)
 cpue.yrs <- years[check.yrs > 0]
 
 Par <- list(
-  mfrow = c(2, 1),
+  mfrow = c(3, 1),
   mai = c(0.35, 0.15, 0, .15),
   omi = c(0.3, 0.25, 0.2, 0) + 0.1,
   mgp = c(2, 0.5, 0),
@@ -184,7 +185,7 @@ png(
   units = "in"
 )
 par(Par)
-for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
+for (i in 1:n.indices) { ###CHANGED to 1:2 from 1:n.indices
 
   # set observed vs predicted CPUE
   # par(mfrow=c(1,1))
@@ -194,18 +195,19 @@ for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
 
   fit <- apply(posteriors$CPUE[, , i], 2, quantile, c(0.025, 0.5, 0.975))
   mufit <- mean(fit[2, ])
-  fit <- fit / mufit
+  #fit <- fit / mufit
   cpue.i <- CPUE[is.na(CPUE[, i]) == F, i]
   yr.i <- Yr[is.na(CPUE[, i]) == F]
   se.i <- sqrt(se2[is.na(CPUE[, i]) == F, (i)])
 
-  ylim <- c(min(fit * 0.9, exp(log(cpue.i) - 1.96 * se.i) / mufit), max(fit * 1.05, exp(log(cpue.i) + 1.96 * se.i) / mufit))
+  ylim <- c(min(fit * 0.9, exp(log(cpue.i) - 1.96 * se.i)), 
+            max(fit * 1.05, exp(log(cpue.i) + 1.96 * se.i)))
   cord.x <- c(Yr, rev(Yr))
   cord.y <- c(fit[1, yr], rev(fit[3, yr]))
 
   # Plot Observed vs predicted CPUE
   # plot(years,CPUE[,i],ylab="",xlab="",ylim=ylim,xlim=range(years),type='n',xaxt="n",yaxt="n")
-  plot(years, CPUE[, i], ylab = "", xlab = "", ylim = ylim, xlim = range(yr.i), type = "n", xaxt = "n", yaxt = "n")
+  plot(yr.i, cpue.i, ylab = "", xlab = "", ylim = ylim,  xlim = range(yr.i), type = "n", xaxt = "n", yaxt = "n")
   axis(1, labels = TRUE, cex = 0.8)
   axis(2, labels = TRUE, cex = 0.8)
   polygon(cord.x, cord.y, col = grey(0.5, 0.5), border = 0, lty = 2)
@@ -216,9 +218,9 @@ for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
     max(se2) > 0.01) {
     plotCI(
       yr.i,
-      cpue.i / mufit,
-      ui = exp(log(cpue.i) + 1.96 * se.i) / mufit,
-      li = exp(log(cpue.i) - 1.96 * se.i) / mufit,
+      cpue.i,
+      ui = exp(log(cpue.i) + 1.96 * se.i),
+      li = exp(log(cpue.i) - 1.96 * se.i),
       add = T,
       gap = 0,
       pch = 21,
@@ -228,7 +230,7 @@ for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
   } else {
     points(
       yr.i,
-      cpue.i / mufit,
+      cpue.i,
       pch = 21,
       xaxt = "n",
       yaxt = "n",
@@ -236,6 +238,8 @@ for (i in 1:2) { ###CHANGED to 1:2 from 1:n.indices
     )
   }
 
+
+  
   legend("bottomleft", paste(indices[i]), bty = "n", y.intersp = -0.2, cex = 0.9)
   legend("topright",
     # c('topright','topleft')[ifelse(i %% 2 == 0,2,1)],
@@ -287,10 +291,10 @@ for (i in 1:n.indices) {
     Yr,
     type = "n",
     ylim = c(min(-1, -1.2 * max(
-      abs(Resids),
+      abs(tempResid[,2]),
       na.rm = T
     )), max(1, 1.2 * max(
-      abs(Resids),
+      abs(tempResid[,2]),
       na.rm = T
     ))),
     # xlim = c(1958,2005),

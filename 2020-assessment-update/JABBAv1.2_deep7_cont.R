@@ -58,6 +58,7 @@ endyr = max(years)
 n.years = length(years)
 styr.cpue = min(cpue[,1])
 styr.I = styr.cpue-styr+1 
+syrs = which(!is.na(cpue$CPUE_3)) #added by Meg years of survey data
 
 
 # Convert input data to matrices for JAGS input
@@ -482,8 +483,8 @@ if(shape==FALSE){
 
 cat(paste0("\n","><> Plot Prior distributions in Input subfolder  <><","\n"))
 
-Par = list(mfrow=c(1,3),mai=c(0.5,0.1,0,.1),omi = c(0.1,0.2,0.1,0) + 0.1,mgp=c(2,1,0), tck = -0.02,cex=0.8)
-png(file = paste0(input.dir,"/Priors_",assessment,"_",Scenario,".png"), width = 9, height = 3, 
+Par = list(mfrow=c(2,2),mai=c(0.5,0.1,0,.1),omi = c(0.1,0.2,0.1,0) + 0.1,mgp=c(2,1,0), tck = -0.02,cex=0.8)
+png(file = paste0(input.dir,"/Priors_",assessment,"_",Scenario,".png"), width = 9, height = 9, 
     res = 200, units = "in")
 par(Par)
 K.pr = plot_lnorm(exp(log.K),CV.K,Prior="K")
@@ -497,9 +498,10 @@ if(psi.dist=="beta"){
 r.pr = plot_lnorm(mu=exp(log.r),CV=CV.r,Prior="r")
 mtext(paste("Density"), side=2, outer=TRUE, at=0.5,line=1,cex=0.9)
 
+### Added for calculating effective area radius priors ###################
 rad.pr = plot_lnorm(mu = log(target_rad_mean), CV_rad, Prior = "Radius")
 dev.off() 
-
+##########################################################################
 
 cat(paste0("\n","><> Plot assumed Surplus Production shape in Input subfolder  <><","\n"))
 
@@ -615,8 +617,11 @@ surplus.dat <- list(
   r.pr = r.pr,
   psi.pr = psi.pr,
   K.pr = K.pr,
-  rad.pr = rad.pr,
+  rad.pr = rad.pr, #added for effective area radius prior
+  n.grid = n.grid, #added for number of sampling grids in sampling domain
+  a.grid = a.grid, #added for area of sampling grid
   # nq=nq,   #removed because not using a for-loop for q priors anymore
+  s_lambda = s_lambda, #added for BFISH survey weighting
   nI = nI,
   nvar = nvar,
   sigma.fixed = ifelse(sigma.proc == TRUE, 0, sigma.proc),
@@ -627,6 +632,7 @@ surplus.dat <- list(
   slope.HS = slope.HS,
   nTAC = nTAC,
   pyrs = pyrs,
+  #Syears = syrs, #added for loop to fit BFISH biomass, survey years
   TAC = TAC,
   igamma = igamma,
   stI = stI,
@@ -639,8 +645,6 @@ surplus.dat <- list(
   sigmaobs_bound = sigmaobs_bound,
   sigmaproc_bound = sigmaproc_bound,
   K_bounds = K_bounds
-  #target_rad_mean = target_rad_mean, # the target mean radius value used from prior BUGS model
-  #CV_rad = CV_rad # CV of 50% based on prior model
 )
 # If shape parameter is estimated (Model =4)
 if(Model==4){
@@ -687,10 +691,13 @@ cat("
     eps <- 0.0000000000000000000000000000000001 # small constant    
     
     
-    ### BFISH Effective Sampling Area Radius Prior
+    ### BFISH Effective Sampling Area Radius Prior ################################
+    
     #rad_precision <- 1.0/log(1.0 + CV_rad * CV_rad)
     #rad_mean <- log(target_rad_mean) - (0.5/rad_precision)
     #rad ~ dlnorm(rad_mean, rad_precision)
+    ### rad.pr was calculated using the plot_lnorm function that was used to generate lognormal priors for K and r 
+    ### see line 502 that is why code above (which was taken from BUGS code) was omitted and replaced with line below
     rad ~ dlnorm(rad.pr[1], pow(rad.pr[2],-2))
     
     
@@ -698,7 +705,7 @@ cat("
    
     q[1] ~ dunif(q_bounds[1],q_bounds[2]) 
     q[2] ~ dunif(q_bounds[1],q_bounds[2]) 
-    q[3] <- 250000/(rad*rad*3.14159)
+    q[3] <- a.grid/(rad*rad*3.14159)
    
    ## removed for loop for q priors because having a deterministic q was causing problems 
     # for(i in 1:nq-1)
@@ -806,6 +813,7 @@ cat("
     Pmean[1] <- log(psi)
     iPV[1] <- ifelse(1<(stI),10000,isigma2) # inverse process variance
     P[1] ~ dlnorm(Pmean[1],iPV[1]) # set to small noise instead of isigma2
+    
     penB[1]  <- ifelse(P[1]<P_bound[1],log(K*P[1])-log(K*P_bound[1]),ifelse(P[1]>P_bound[2],log(K*P[1])-log(K*P_bound[2]),0)) # penalty if Pmean is outside viable biomass
     
     # Process equation
@@ -819,6 +827,7 @@ cat("
     penB[t]  <- ifelse(P[t]<(P_bound[1]),log(K*P[t])-log(K*(P_bound[1])),ifelse(P[t]>P_bound[2],log(K*P[t])-log(K*(P_bound[2])),0)) # penalty if Pmean is outside viable biomass
     }
     
+
     # Process error deviation 
     for(t in 1:N){
     Proc.Dev[t] <- P[t]-exp(Pmean[t])} 
@@ -838,7 +847,7 @@ cat("
     
     # Observation equation in related to EB
     
-    for(i in 1:nI)
+    for(i in 1:(nI-1))
     {
     for (t in 1:N) 
     { 
@@ -847,6 +856,16 @@ cat("
     CPUE[t,i] <- q[sets.q[i]]*P[t]*K
     }}
     
+     for(i in nI){ ## added by Meg for BFISH index
+      for (t in 1:N){ 
+
+        Imean[t,i] <- log(P[t] * K/(q[sets.q[i]])*n.grid)
+        survey_precision[t] <- (s_lambda*s_lambda)/( ivar.obs[t,i])
+        I[t, i] ~ dlnorm(Imean[t,i], survey_precision[t])
+        CPUE[t,i] <- P[t]*K/(q[sets.q[i]]*n.grid)
+
+    }
+    }
     
     #Management quantities
     SBmsy_K <- (m)^(-1/(m-1))
