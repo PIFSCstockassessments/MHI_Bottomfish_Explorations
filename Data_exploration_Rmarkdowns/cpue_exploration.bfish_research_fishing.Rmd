@@ -823,4 +823,923 @@ This document visualizes patterns in species specific catch for research fishing
          caption = "Note: Catch is recorded seperately by bait type within the same sample.")
 ```
 
+```{r p_08, warning=FALSE}
+	cols = c("LUNAR_PHASE","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("Island","LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(Island,LUNAR_PHASE_BIN,LUNAR_PHASE,variable)] %>%
+	.[,LUNAR_PHASE_BIN:=factor(as.character(LUNAR_PHASE_BIN),levels=as.character(seq(from=0,by=0.125,to=1)))] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=as.character(c(0,0.25,0.5,0.75,1)),drop=FALSE) +
+    geom_boxplot(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, degree of lunar illumination, and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_09, warning=FALSE}
+	cols = c("LUNAR_PHASE","JD","MONTH",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("MONTH","JD","LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(MONTH,LUNAR_PHASE_BIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(0,0.25,0.5,0.75,1)) +
+    geom_line(aes(x = LUNAR_PHASE_BIN, y=value, color = variable)) +
+    geom_point(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~MONTH, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, degree of lunar illumination, and month.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_10, warning=FALSE}
+	cols = c("VESSEL",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("VESSEL")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(VESSEL,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,VESSEL:=as.numeric(as.factor(VESSEL))] %>%
+	ggplot() +
+	xlab("Vessel ID") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = VESSEL,xend=VESSEL,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = VESSEL, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and Vessel ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_11, warning=FALSE}
+	cols = c("Island","VESSEL",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","VESSEL")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,VESSEL,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,VESSEL:=as.numeric(as.factor(VESSEL))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Vessel ID") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = VESSEL,xend=VESSEL,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = VESSEL, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, island group, and Vessel ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_12, warning=FALSE}
+	cols = c("CAPTAIN_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("CAPTAIN_CD")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(CAPTAIN_CD,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,CAPTAIN_CD:=as.numeric(as.factor(CAPTAIN_CD))] %>%
+	ggplot() +
+	xlab("Captain ID") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(1,5,10)) +
+    geom_segment(aes(x = CAPTAIN_CD,xend=CAPTAIN_CD,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = CAPTAIN_CD, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and Captain ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_13, warning=FALSE}
+	cols = c("Island","CAPTAIN_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","CAPTAIN_CD")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,CAPTAIN_CD,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,CAPTAIN_CD:=as.numeric(as.factor(CAPTAIN_CD))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Captain ID") + ylab("Positive catch (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = CAPTAIN_CD,xend=CAPTAIN_CD,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = CAPTAIN_CD, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, island group, and Captain ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_14, warning=FALSE}
+	cols = c("TIME_MIN",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,TIME_MIN:=floor(TIME_MIN)] %>%
+	melt(.,id.vars=c("TIME_MIN")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(TIME_MIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,TIME_MIN:=factor(as.character(TIME_MIN),levels=as.character(0:24))] %>%
+	ggplot() +
+	xlab("Time of day") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("6","12","18"),drop=FALSE) +
+    geom_segment(aes(x = TIME_MIN,xend=TIME_MIN,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = TIME_MIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and time of day.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_15, warning=FALSE}
+	cols = c("TIME_MIN","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,TIME_MIN:=floor(TIME_MIN)] %>%
+	melt(.,id.vars=c("Island","TIME_MIN")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,TIME_MIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,TIME_MIN:=factor(as.character(TIME_MIN),levels=as.character(0:24))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Time of day") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("6","12","18"),drop=FALSE) +
+    geom_segment(aes(x = TIME_MIN,xend=TIME_MIN,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = TIME_MIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, time of day, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_16, warning=FALSE}
+	cols = c("DEPTH_M",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,DEPTH_M:=floor(DEPTH_M/50)*50] %>%
+	melt(.,id.vars=c("DEPTH_M")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(DEPTH_M,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,DEPTH_M:=factor(as.character(DEPTH_M),levels=as.character(seq(from=0,to=450,by=50)))] %>%
+	ggplot() +
+	xlab("Depth (m)") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("100","200","300"),drop=FALSE) +
+    geom_segment(aes(x = DEPTH_M,xend=DEPTH_M,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = DEPTH_M, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and depth.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_17, warning=FALSE}
+	cols = c("DEPTH_M","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,DEPTH_M:=(floor(DEPTH_M/50)*50)/100] %>%
+	melt(.,id.vars=c("Island","DEPTH_M")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,DEPTH_M,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,DEPTH_M:=factor(as.character(DEPTH_M),levels=as.character(seq(from=0,to=4.50,by=0.50)))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Depth (100 m)") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("1","2","3"),drop=FALSE) +
+    geom_segment(aes(x = DEPTH_M,xend=DEPTH_M,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = DEPTH_M, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, depth, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_18, warning=FALSE}
+	cols = c("LON",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LON:=floor(LON/0.25)*0.25] %>%
+	melt(.,id.vars=c("LON")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(LON,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,LON:=factor(as.character(LON),levels=as.character(seq(from=-160.5,to=-154,by=0.250)))] %>%
+	ggplot() +
+	xlab("Longitude") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("-158","-156","-154"),drop=FALSE) +
+    geom_segment(aes(x = LON,xend=LON,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LON, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and longitude.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_19, warning=FALSE}
+	cols = c("Island","LON",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LON:=floor(LON/0.25)*0.25] %>%
+	melt(.,id.vars=c("Island","LON")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,LON,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	.[,LON:=factor(as.character(LON),levels=as.character(seq(from=-160.5,to=-154,by=0.250)))] %>%
+	ggplot() +
+	xlab("Longitude") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("-158","-156","-154"),drop=FALSE) +
+    geom_segment(aes(x = LON,xend=LON,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LON, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, longitude, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_20, warning=FALSE}
+	cols = c("LAT",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LAT:=floor(LAT/0.25)*0.25] %>%
+	melt(.,id.vars=c("LAT")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(LAT,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,LAT:=factor(as.character(LAT),levels=as.character(seq(from=18.5,to=22.5,by=0.250)))] %>%
+	ggplot() +
+	xlab("Latitude") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("19","20","21"),drop=FALSE) +
+    geom_segment(aes(x = LAT,xend=LAT,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LAT, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and latitude.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_21, warning=FALSE}
+	cols = c("Island","LAT",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LAT:=floor(LAT/0.25)*0.25] %>%
+	melt(.,id.vars=c("Island","LAT")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,LAT,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	.[,LAT:=factor(as.character(LAT),levels=as.character(seq(from=18.5,to=22.5,by=0.250)))] %>%
+	ggplot() +
+	xlab("Latitude") + ylab("Positive catch (n)") +
+	scale_x_discrete(breaks=c("19","20","21"),drop=FALSE) +
+    geom_segment(aes(x = LAT,xend=LAT,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LAT, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, latitude, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r p_22, warning=FALSE}
+	cols = c("STRATA",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("STRATA")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(STRATA,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Survey strata") + ylab("Positive catch (n)") +
+    geom_segment(aes(x = STRATA,xend=STRATA,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = STRATA, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species and survey strata.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r p_23, warning=FALSE}
+	cols = c("Island","STRATA",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","STRATA")) %>%
+	.[value==0,value:=NA] %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,STRATA,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Survey strata") + ylab("Positive catch (n)") +
+    geom_segment(aes(x = STRATA,xend=STRATA,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = STRATA, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Positive catch by species, survey strata, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
 ## Nominal CPUE
+
+
+```{r n_01, warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Year") + ylab("Nominal CPUE (n)") +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = variable),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~ variable, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_02, warning=FALSE}
+	cols = c("YEAR","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","Island")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,Island,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = variable),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = variable),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_03, warning=FALSE}
+	cols = c("YEAR","BAIT_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,BAIT_CD,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = BAIT_CD),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_color_nmfs(name="Bait type",palette="regional web") +
+    scale_fill_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Nominal CPUE by species.")
+```
+
+
+```{r n_04, warning=FALSE}
+	cols = c("YEAR","BAIT_CD","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("YEAR","BAIT_CD","Island")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(YEAR,BAIT_CD,Island,variable)] %>%
+	.[,YEAR:=as.numeric(YEAR)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,BAIT_CD:=factor(BAIT_CD,levels=c("F","S"),labels=c("Fish","Squid"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Year") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(2017,2019)) +
+    geom_path(aes(x = YEAR, y=value, color = BAIT_CD),size=1,alpha=0.5) +
+    geom_point(aes(x = YEAR, y=value, fill = BAIT_CD),shape=21,color="black",size=1.25) +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+	scale_color_nmfs(name="Bait type",palette="regional web") +
+    scale_fill_nmfs(name="Bait type",palette="regional web") +
+    labs(title = "Nominal CPUE by species, bait type, and island group.")
+```
+
+```{r n_05, warning=FALSE}
+	cols = c("JD","MONTH",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(JD,MONTH,variable)] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and month.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_06, warning=FALSE}
+	cols = c("JD","MONTH","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("JD","MONTH","Island")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(JD,MONTH,Island,variable)] %>%
+	.[,JD:=as.numeric(JD)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Month") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("Feb","May","Aug","Nov"),drop=FALSE) +
+    geom_boxplot(aes(x = MONTH, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, month, and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_07, warning=FALSE}
+	cols = c("LUNAR_PHASE",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(LUNAR_PHASE_BIN,LUNAR_PHASE,variable)] %>%
+	.[,LUNAR_PHASE_BIN:=factor(as.character(LUNAR_PHASE_BIN),levels=as.character(seq(from=0,by=0.125,to=1)))] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=as.character(c(0,0.25,0.5,0.75,1)),drop=FALSE) +
+    geom_boxplot(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and degree of lunar illumination.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_08, warning=FALSE}
+	cols = c("LUNAR_PHASE","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("Island","LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[,.(value=mean(value,na.rm=TRUE)),by=.(Island,LUNAR_PHASE_BIN,LUNAR_PHASE,variable)] %>%
+	.[,LUNAR_PHASE_BIN:=factor(as.character(LUNAR_PHASE_BIN),levels=as.character(seq(from=0,by=0.125,to=1)))] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=as.character(c(0,0.25,0.5,0.75,1)),drop=FALSE) +
+    geom_boxplot(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, degree of lunar illumination, and island group.",
+         caption = "Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_09, warning=FALSE}
+	cols = c("LUNAR_PHASE","JD","MONTH",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LUNAR_PHASE_BIN:=floor(LUNAR_PHASE/0.125)*0.125] %>%
+	melt(.,id.vars=c("MONTH","JD","LUNAR_PHASE_BIN","LUNAR_PHASE")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(MONTH,LUNAR_PHASE_BIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,MONTH:=as.numeric(MONTH)] %>%
+	.[,MONTH:=factor(as.character(MONTH),levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"))] %>%
+	ggplot() +
+	xlab("Lunar illumination") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(0,0.25,0.5,0.75,1)) +
+    geom_line(aes(x = LUNAR_PHASE_BIN, y=value, color = variable)) +
+    geom_point(aes(x = LUNAR_PHASE_BIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~MONTH, scales = "free") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, degree of lunar illumination, and month.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_10, warning=FALSE}
+	cols = c("VESSEL",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("VESSEL")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(VESSEL,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,VESSEL:=as.numeric(as.factor(VESSEL))] %>%
+	ggplot() +
+	xlab("Vessel ID") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = VESSEL,xend=VESSEL,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = VESSEL, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and Vessel ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_11, warning=FALSE}
+	cols = c("Island","VESSEL",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","VESSEL")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,VESSEL,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,VESSEL:=as.numeric(as.factor(VESSEL))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Vessel ID") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = VESSEL,xend=VESSEL,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = VESSEL, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, island group, and Vessel ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_12, warning=FALSE}
+	cols = c("CAPTAIN_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("CAPTAIN_CD")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(CAPTAIN_CD,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,CAPTAIN_CD:=as.numeric(as.factor(CAPTAIN_CD))] %>%
+	ggplot() +
+	xlab("Captain ID") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(1,5,10)) +
+    geom_segment(aes(x = CAPTAIN_CD,xend=CAPTAIN_CD,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = CAPTAIN_CD, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and Captain ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_13, warning=FALSE}
+	cols = c("Island","CAPTAIN_CD",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","CAPTAIN_CD")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,CAPTAIN_CD,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,CAPTAIN_CD:=as.numeric(as.factor(CAPTAIN_CD))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Captain ID") + ylab("Nominal CPUE (n)") +
+	scale_x_continuous(breaks=c(1,5,10,15)) +
+    geom_segment(aes(x = CAPTAIN_CD,xend=CAPTAIN_CD,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = CAPTAIN_CD, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, island group, and Captain ID.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_14, warning=FALSE}
+	cols = c("TIME_MIN",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,TIME_MIN:=floor(TIME_MIN)] %>%
+	melt(.,id.vars=c("TIME_MIN")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(TIME_MIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,TIME_MIN:=factor(as.character(TIME_MIN),levels=as.character(0:24))] %>%
+	ggplot() +
+	xlab("Time of day") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("6","12","18"),drop=FALSE) +
+    geom_segment(aes(x = TIME_MIN,xend=TIME_MIN,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = TIME_MIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and time of day.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_15, warning=FALSE}
+	cols = c("TIME_MIN","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,TIME_MIN:=floor(TIME_MIN)] %>%
+	melt(.,id.vars=c("Island","TIME_MIN")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,TIME_MIN,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,TIME_MIN:=factor(as.character(TIME_MIN),levels=as.character(0:24))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Time of day") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("6","12","18"),drop=FALSE) +
+    geom_segment(aes(x = TIME_MIN,xend=TIME_MIN,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = TIME_MIN, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, time of day, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_16, warning=FALSE}
+	cols = c("DEPTH_M",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,DEPTH_M:=floor(DEPTH_M/50)*50] %>%
+	melt(.,id.vars=c("DEPTH_M")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(DEPTH_M,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,DEPTH_M:=factor(as.character(DEPTH_M),levels=as.character(seq(from=0,to=450,by=50)))] %>%
+	ggplot() +
+	xlab("Depth (m)") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("100","200","300"),drop=FALSE) +
+    geom_segment(aes(x = DEPTH_M,xend=DEPTH_M,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = DEPTH_M, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and depth.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_17, warning=FALSE}
+	cols = c("DEPTH_M","Island",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,DEPTH_M:=(floor(DEPTH_M/50)*50)/100] %>%
+	melt(.,id.vars=c("Island","DEPTH_M")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,DEPTH_M,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,DEPTH_M:=factor(as.character(DEPTH_M),levels=as.character(seq(from=0,to=4.50,by=0.50)))] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Depth (100 m)") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("1","2","3"),drop=FALSE) +
+    geom_segment(aes(x = DEPTH_M,xend=DEPTH_M,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = DEPTH_M, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, depth, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_18, warning=FALSE}
+	cols = c("LON",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LON:=floor(LON/0.25)*0.25] %>%
+	melt(.,id.vars=c("LON")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(LON,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,LON:=factor(as.character(LON),levels=as.character(seq(from=-160.5,to=-154,by=0.250)))] %>%
+	ggplot() +
+	xlab("Longitude") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("-158","-156","-154"),drop=FALSE) +
+    geom_segment(aes(x = LON,xend=LON,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LON, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and longitude.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_19, warning=FALSE}
+	cols = c("Island","LON",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LON:=floor(LON/0.25)*0.25] %>%
+	melt(.,id.vars=c("Island","LON")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,LON,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	.[,LON:=factor(as.character(LON),levels=as.character(seq(from=-160.5,to=-154,by=0.250)))] %>%
+	ggplot() +
+	xlab("Longitude") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("-158","-156","-154"),drop=FALSE) +
+    geom_segment(aes(x = LON,xend=LON,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LON, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, longitude, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_20, warning=FALSE}
+	cols = c("LAT",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LAT:=floor(LAT/0.25)*0.25] %>%
+	melt(.,id.vars=c("LAT")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(LAT,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,LAT:=factor(as.character(LAT),levels=as.character(seq(from=18.5,to=22.5,by=0.250)))] %>%
+	ggplot() +
+	xlab("Latitude") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("19","20","21"),drop=FALSE) +
+    geom_segment(aes(x = LAT,xend=LAT,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LAT, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and latitude.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_21, warning=FALSE}
+	cols = c("Island","LAT",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	.[,LAT:=floor(LAT/0.25)*0.25] %>%
+	melt(.,id.vars=c("Island","LAT")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,LAT,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	.[,LAT:=factor(as.character(LAT),levels=as.character(seq(from=18.5,to=22.5,by=0.250)))] %>%
+	ggplot() +
+	xlab("Latitude") + ylab("Nominal CPUE (n)") +
+	scale_x_discrete(breaks=c("19","20","21"),drop=FALSE) +
+    geom_segment(aes(x = LAT,xend=LAT,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = LAT, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, latitude, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+
+```{r n_22, warning=FALSE}
+	cols = c("STRATA",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("STRATA")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(STRATA,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	ggplot() +
+	xlab("Survey strata") + ylab("Nominal CPUE (n)") +
+    geom_segment(aes(x = STRATA,xend=STRATA,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = STRATA, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +
+    facet_wrap(~variable, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species and survey strata.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
+
+```{r n_23, warning=FALSE}
+	cols = c("Island","STRATA",deep8_code_vec)
+	research_fishing_dt %>%
+	.[,cols,with=FALSE] %>%
+	melt(.,id.vars=c("Island","STRATA")) %>%
+	.[,.(value=mean(value,na.rm=TRUE),.N),by=.(Island,STRATA,variable)] %>%
+	.[,variable:=factor(variable,levels=deep8_code_vec,labels=deep8_name_vec)] %>%
+	.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))] %>%
+	ggplot() +
+	xlab("Survey strata") + ylab("Nominal CPUE (n)") +
+    geom_segment(aes(x = STRATA,xend=STRATA,y=0, yend=value, color = variable)) +
+    geom_point(aes(x = STRATA, y=value, fill = variable,size=N),shape=21,color="black") +
+    geom_hline(yintercept = 0) +
+    theme_classic(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1)) +
+    facet_grid(variable~Island, scales = "free_y") +
+    scale_fill_nmfs(name="Species",palette="regional web") +
+    scale_color_nmfs(name="Species",palette="regional web") +
+    labs(title = "Nominal CPUE by species, survey strata, and island group.",
+         caption = "Circle size represents the number of fishing sets. \n Note: Catch is recorded seperately by bait type within the same sample.")
+```
