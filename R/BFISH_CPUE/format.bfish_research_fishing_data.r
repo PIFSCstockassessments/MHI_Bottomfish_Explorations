@@ -79,26 +79,81 @@
 			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction]
 
-	# catches (one row per individual)
+	# bring in conversion factor data
+	species_dt = fread(paste0(proj.dir,"Data/SPECIES_TABLE.csv")) %>%
+				 .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
+				 unique(.)
+
+
+	# catches (one row per length measurement)
 	BFISH_C = fread(paste0(proj.dir,"Data/CRF_CATCH.csv")) %>%
-			  .[,.N,by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD)] %>%
-			  .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP","ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
-			  .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"] # %>%
+			  .[,.N,by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,LENGTH_CM)] %>%
+			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
+			  merge(.,species_dt[,.(SPECIES_CD,A,B,GCF)]) %>%
+			  .[,STD_N:=N/GCF] %>% 
+			  .[,Biomass:=A * (LENGTH_CM^B)] %>%
+			  .[,KG:=Biomass*N] %>%
+			  .[,STD_KG:=Biomass*STD_N] %>%
+			  .[,Length_category:=as.character(NA)] %>%
+			  .[LENGTH_CM>=29,Length_category:="Exploitable"] %>%
+			  .[LENGTH_CM<29,Length_category:="Un-exploitable"] %>%
+			  .[is.na(LENGTH_CM),Length_category:="Unknown"] %>%
+			  .[,.(N=sum(N),STD_N=sum(N),KG=sum(KG),STD_KG=sum(STD_KG)),by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,Length_category)] %>%
+			  # keep only exploitable "sized" biomass
+			  .[Length_category=="Exploitable"] %>%
+			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,N,KG,STD_N,STD_KG)]
+			  # .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"] # %>%
 			  # .[,SPECIES_GRP:="Deep7"] %>%
 			  # .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP"), SPECIES_GRP:="Other"]
 	samples_missing_bait = unique(BFISH_C[is.na(BAIT_CD)]$SAMPLE_ID)
 	# exclude 15 samples where bait was missing for recorded fish
+	BFISH_C_long = copy(BFISH_C)
 	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))] %>%
-			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="N",fill=0,fun.aggregate=sum) %>%
-			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,APVI,SEDU,SQMI,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
+			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
+			  # keep only biomass measurement
+			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
+			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
 	
 	# PSU specific information
 	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
-				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,Depth_MEAN_m,Depth_MAJORITY_m,Depth_MIN_m,Depth_MAX_m,Depth_STD_m,med_slp,med_acr,Depth_px_n,Slp_px_n,BS_px_nj,BS_px_over_136j,BS_pct_over_136j,pctHB,pctHS)]
+				.[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
+				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
+				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
+
 
 	research_fishing_dt = merge(BFISH_S,BFISH_D,by=c("BFISH","SAMPLE_ID")) %>%
 						  # this next line drops 17 samples with bad PSUs
-						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020)],by="PSU") %>%
+						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
+						  .[,depth_strata:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<200,"S",ifelse(Depth_MEDIAN_m<300,"M",ifelse(Depth_MEDIAN_m<400,"D","ZZ"))))] %>%
+						  .[,depth_strata_2020:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<110,"D1",ifelse(Depth_MEDIAN_m<170,"D2",ifelse(Depth_MEDIAN_m<200,"D3",ifelse(Depth_MEDIAN_m<330,"D4",ifelse(Depth_MEDIAN_m<400,"D5","ZZ"))))))] %>%
+						  .[,complexity:=ifelse(med_acr<4,"MA1",ifelse(med_acr<9,"MA2","MA3"))] %>%
+						  .[,hardness:=ifelse(BS_pct_over_136j<0.24,"HB1",ifelse(BS_pct_over_136j<0.46,"HB2","HB3"))] %>%
+						  # .[,STRATA:=paste0(substrate,"_",slope,"_",depth_strata)] %>%
+						  # .[,STRATA_2020:=as.character(NA)] %>%
+						  # .[depth_strata_2020=="D1"&complexity%in%c("MA1","MA2")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S01"] %>%
+						  # .[depth_strata_2020=="D1"&complexity%in%c("MA3")&hardness%in%c("HB1"),STRATA_2020:="S02"] %>%
+						  # .[depth_strata_2020=="D1"&complexity%in%c("MA3")&hardness%in%c("HB2"),STRATA_2020:="S03"] %>%
+						  # .[depth_strata_2020=="D1"&complexity%in%c("MA3")&hardness%in%c("HB3"),STRATA_2020:="S04"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA1")&hardness%in%c("HB1","HB2"),STRATA_2020:="S05"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA1")&hardness%in%c("HB3"),STRATA_2020:="S06"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA2")&hardness%in%c("HB1"),STRATA_2020:="S07"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA2")&hardness%in%c("HB2"),STRATA_2020:="S08"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA2")&hardness%in%c("HB3"),STRATA_2020:="S09"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA3")&hardness%in%c("HB1"),STRATA_2020:="S10"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA3")&hardness%in%c("HB2"),STRATA_2020:="S11"] %>%
+						  # .[depth_strata_2020=="D2"&complexity%in%c("MA3")&hardness%in%c("HB3"),STRATA_2020:="S12"] %>%
+						  # .[depth_strata_2020=="D3"&complexity%in%c("MA1","MA2")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S13"] %>%
+						  # .[depth_strata_2020=="D3"&complexity%in%c("MA3")&hardness%in%c("HB1"),STRATA_2020:="S14"] %>%
+						  # .[depth_strata_2020=="D3"&complexity%in%c("MA3")&hardness%in%c("HB2"),STRATA_2020:="S15"] %>%
+						  # .[depth_strata_2020=="D3"&complexity%in%c("MA3")&hardness%in%c("HB3"),STRATA_2020:="S16"] %>%		
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA1","MA2")&hardness%in%c("HB1","HB2"),STRATA_2020:="S17"] %>%
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA1")&hardness%in%c("HB3"),STRATA_2020:="S18"] %>%
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA2")&hardness%in%c("HB3"),STRATA_2020:="S19"] %>%
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA3")&hardness%in%c("HB1"),STRATA_2020:="S20"] %>%
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA3")&hardness%in%c("HB2"),STRATA_2020:="S21"] %>%
+						  # .[depth_strata_2020=="D4"&complexity%in%c("MA3")&hardness%in%c("HB3"),STRATA_2020:="S22"] %>%
+						  # .[depth_strata_2020=="D5"&complexity%in%c("MA1","MA2")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S23"] %>%
+						  # .[depth_strata_2020=="D5"&complexity%in%c("MA3")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S24"] %>%
 						  .[,BAIT_CD:="S"]
 	tmp_dt = copy(research_fishing_dt)
 	tmp_dt$BAIT_CD = "F"
@@ -106,16 +161,19 @@
 						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID","BAIT_CD"),all=TRUE) %>%
 						  # this next line drops 14 samples with missing PSUs
 						  .[!is.na(PSU)] %>%
+						  # drops 8 PSUs outside of EFH 75-400m
+						  .[!(depth_strata%in%c("Z","ZZ"))] %>%
 						  .[is.na(APRU),APRU:=0] %>%
-						  .[is.na(APVI),APVI:=0] %>%
 						  .[is.na(ETCA),ETCA:=0] %>%
 						  .[is.na(ETCO),ETCO:=0] %>%
 						  .[is.na(HYQU),HYQU:=0] %>%
 						  .[is.na(PRFI),PRFI:=0] %>%
 						  .[is.na(PRSI),PRSI:=0] %>%
 						  .[is.na(PRZO),PRZO:=0] %>%
-						  .[is.na(SEDU),SEDU:=0] %>%
-						  .[is.na(SQMI),SQMI:=0]
+						  # drop samples with missing values
+						  na.omit(.)
+
+						
 	
 	# save formatted data
 		save(BFISH_D,file=paste0(proj.dir,"Data/BFISH_D.RData"))
@@ -123,4 +181,3 @@
 		save(BFISH_C,file=paste0(proj.dir,"Data/BFISH_C.RData"))
 		save(PSU_table,file=paste0(proj.dir,"Data/PSU_table.RData"))
 		save(research_fishing_dt,file=paste0(proj.dir,"Data/research_fishing_dt.RData"))
-
