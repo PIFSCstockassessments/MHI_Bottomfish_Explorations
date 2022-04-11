@@ -2,8 +2,8 @@
 
 library(sas7bdat)
 
-observed_catch = read.sas7bdat("i3.sas7bdat", debug=TRUE)
-unavailable_catch = read.sas7bdat("i2.sas7bdat", debug=TRUE) # /Users/Toby/Downloads/MRIP_Ifiles_HI/
+observed_catch = read.sas7bdat("./MRIP_Ifiles_HI/i3.sas7bdat", debug=TRUE)
+unavailable_catch = read.sas7bdat("./MRIP_Ifiles_HI/i2.sas7bdat", debug=TRUE)
 
 species_df = data.frame("key" = c(8835020413, 8835360304, 8835360302, 8835360704, 8835360706, 8835360901, 8835360707),
                         "common_name" = c("Hawaiian Grouper", "Long-tail Red Snapper", "Ruby Snapper", "Pink Snapper", "Von Siebold's Snapper", "Ironjaw Snapper", "Brigham's Snapper"),
@@ -142,7 +142,7 @@ for(i in 1:length(years)) {
 
 # effort
 
-effort_df = read.csv("/Users/Toby/Downloads/MRIP_Ifiles_HI/mrip_effort_series.csv")
+effort_df = read.csv("./MRIP_Ifiles_HI/mrip_effort_series.csv")
 effort_df$Wave = ordered(effort_df$Wave, levels = c("JANUARY/FEBRUARY", "MARCH/APRIL", "MAY/JUNE", "JULY/AUGUST", "SEPTEMBER/OCTOBER", "NOVEMBER/DECEMBER"))
 effort_df$Wave_num = as.numeric(effort_df$Wave)
 effort_df = effort_df[effort_df$Fishing.Mode == "PRIVATE/RENTAL BOAT",]
