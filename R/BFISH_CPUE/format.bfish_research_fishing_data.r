@@ -98,7 +98,9 @@
 			  .[LENGTH_CM>=29,Length_category:="Exploitable"] %>%
 			  .[LENGTH_CM<29,Length_category:="Un-exploitable"] %>%
 			  .[is.na(LENGTH_CM),Length_category:="Unknown"] %>%
-			  .[,.(N=sum(N),STD_N=sum(N),KG=sum(KG),STD_KG=sum(STD_KG)),by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,Length_category)] %>%
+			  .[,.(N=sum(N),STD_N=sum(N),KG=sum(KG),STD_KG=sum(STD_KG)),by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,Length_category)]
+	missing_lengths = unique(BFISH_C[Length_category=="Unknown"]$SAMPLE_ID)
+	BFISH_C = BFISH_C %>%
 			  # keep only exploitable "sized" biomass
 			  .[Length_category=="Exploitable"] %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,N,KG,STD_N,STD_KG)]
@@ -109,6 +111,8 @@
 	# exclude 15 samples where bait was missing for recorded fish
 	BFISH_C_long = copy(BFISH_C)
 	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))] %>%
+			   # exclude 10 samples where lengths are missing
+			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
 			  # keep only biomass measurement
 			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%

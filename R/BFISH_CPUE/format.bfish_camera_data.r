@@ -90,6 +90,61 @@
 
 #_____________________________________________________________________________________________________________________________
 # bring in camera data
+	# bring in conversion factor data
+	species_dt = fread(paste0(proj.dir,"Data/SPECIES_TABLE.csv")) %>%
+				 .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
+				 unique(.)
+
+	# PSU specific information
+	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
+				.[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
+				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
+				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
+
+	# catches (one row per length measurement)
+	# remove these drops/PSUs
+	dark_drops = fread(paste0(proj.dir,"Data/CAM_MAXN.csv"))[SPECIES_CD == "DARK"]$DROP_CD
+	BFISH_CAM_COUNT = fread(paste0(proj.dir,"Data/CAM_MAXN.csv")) %>%
+			  .[,.(MAXN=sum(MAXN)),by=.(DROP_CD,SPECIES_CD)] %>%
+			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
+			  .[!(DROP_CD %in% dark_drops)]
+	BFISH_CAM_LENGTHS = fread(paste0(proj.dir,"Data/CAM_LENGTHS.csv")) %>%
+			      .[,LENGTH_CM:=round(MEAN_MM/10)] %>%
+				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
+				  .[,.N,by=.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
+				  .[,TOTAL_N:=sum(N),by=.(DROP_CD,SPECIES_CD)] %>%
+				  .[,PROP_N:=N/TOTAL_N] %>%
+				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM,PROP_N)] %>%
+				  .[!(DROP_CD %in% dark_drops)]
+
+	BFISH_CAM_C = merge(BFISH_CAM_LENGTHS,BFISH_CAM_COUNT,by=c("DROP_CD","SPECIES_CD"),all.x=TRUE,all.y=TRUE) %>%
+			  	  merge(.,species_dt[,.(SPECIES_CD,A,B,GCF)],by="SPECIES_CD") %>%
+			  .[,N:=MAXN*PROP_N] %>%
+			  .[,STD_N:=N] %>% 
+			  .[,Biomass:=A * (LENGTH_CM^B)] %>%
+			  .[,KG:=Biomass*N] %>%
+			  .[,STD_KG:=Biomass*STD_N] %>%
+			  .[,Length_category:=as.character(NA)] %>%
+			  .[LENGTH_CM>=29,Length_category:="Exploitable"] %>%
+			  .[LENGTH_CM<29,Length_category:="Un-exploitable"] %>%
+			  .[is.na(LENGTH_CM),Length_category:="Unknown"]
+	# remove drops where length is missing
+	missing_lengths = unique(BFISH_CAM_C[Length_category == "Unknown"]$DROP_CD)
+
+	BFISH_CAM_C = BFISH_CAM_C %>%
+			  .[,.(N=sum(N,na.rm=TRUE),STD_N=sum(N,na.rm=TRUE),KG=sum(KG,na.rm=TRUE),STD_KG=sum(STD_KG,na.rm=TRUE)),by=.(BFISH,DROP_CD,SPECIES_CD,Length_category)] %>%
+			  # keep only exploitable "sized" biomass
+			  .[Length_category=="Exploitable"] %>%
+			  .[,.(DROP_CD,SPECIES_CD,N,KG,STD_N,STD_KG)]
+
+	BFISH_CAM_C_long = copy(BFISH_CAM_C)
+	BFISH_CAM_C = BFISH_CAM_C %>% .[!(DROP_CD %in% c(missing_lengths))] %>%
+			  .[,.(DROP_CD,SPECIES_CD,KG)] %>%
+			  # keep only biomass measurement
+			  dcast(.,DROP_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
+			  .[,.(DROP_CD,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
+			
+
 	# drop-specific information
 	BFISH_CAM_S = fread(paste0(proj.dir,"Data/CAM_SAMPLE_TIME.csv")) %>%
 			  .[,.(DROP_CD,DROP_DATE,DROP_TIME,VESSEL,GEAR_ID,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)] %>%
@@ -101,31 +156,28 @@
 			  .[,JD:=format(SAMPLE_DATE,format="%j")] %>%
 			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction] %>%
-			  .[,SAMPLE_ID:=paste0(PSU,"_",DROP_DATE)] %>%
-			  .[,.(SAMPLE_ID,DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,GEAR_ID,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]
+			  .[,.(DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]  %>%
+			  .[!(DROP_CD %in% dark_drops)] %>%
+			  .[!(DROP_CD %in% c(missing_lengths))]
 
-			# need to manually edit SAMPLE_ID to combine samples across multiple days
-			mult_PSU = BFISH_CAM_S[,.N,by=PSU][N>2]$PSU
-			as.data.frame(BFISH_CAM_S[PSU %in% mult_PSU][order(PSU),.(SAMPLE_ID,PSU,SAMPLE_DATE)])
-				# 20   8304_20170312  8304  2017-03-12
-				# 21   8304_20170313  8304  2017-03-13
+	camera_dt = merge(BFISH_CAM_S,BFISH_CAM_C,by=c("DROP_CD"),all=TRUE) %>%
+						  # this next line drops 17 samples with bad PSUs
+						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
+						  .[,depth_strata:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<200,"S",ifelse(Depth_MEDIAN_m<300,"M",ifelse(Depth_MEDIAN_m<400,"D","ZZ"))))] %>%
+						  .[,depth_strata_2020:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<110,"D1",ifelse(Depth_MEDIAN_m<170,"D2",ifelse(Depth_MEDIAN_m<200,"D3",ifelse(Depth_MEDIAN_m<330,"D4",ifelse(Depth_MEDIAN_m<400,"D5","ZZ"))))))] %>%
+						  .[,complexity:=ifelse(med_acr<4,"MA1",ifelse(med_acr<9,"MA2","MA3"))] %>%
+						  .[,hardness:=ifelse(BS_pct_over_136j<0.24,"HB1",ifelse(BS_pct_over_136j<0.46,"HB2","HB3"))] %>%
+						  .[is.na(APRU),APRU:=0] %>%
+						  .[is.na(ETCA),ETCA:=0] %>%
+						  .[is.na(ETCO),ETCO:=0] %>%
+						  .[is.na(HYQU),HYQU:=0] %>%
+						  .[is.na(PRFI),PRFI:=0] %>%
+						  .[is.na(PRSI),PRSI:=0] %>%
+						  .[is.na(PRZO),PRZO:=0] %>%
+						  # drop samples with missing values
+						  na.omit(.)
 
-				# 28  20261_20181029 20261  2018-10-29
-				# 29  20261_20181029 20261  2018-10-29
-				# 30  20261_20181030 20261  2018-10-30
-
-				# 54  25772_20201012 25772  2020-10-12
-				# 55  25772_20201012 25772  2020-10-12
-				# 56  25772_20201013 25772  2020-10-13
-				# 57  25772_20201013 25772  2020-10-13
-
-				# 70  31830_20170315 31830  2017-03-15
-				# 71  31830_20170315 31830  2017-03-15
-				# 72  31830_20170316 31830  2017-03-16
-
-				# 83  33107_20171117 33107  2017-11-17
-				# 84  33107_20171118 33107  2017-11-18
-
-				# 143 38422_20161019 38422  2016-10-19
-				# 144 38422_20161020 38422  2016-10-20
-		  
+	# save formatted data
+		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/BFISH_CAM_S.RData"))
+		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/BFISH_CAM_C.RData"))
+		save(camera_dt,file=paste0(proj.dir,"Data/camera_dt.RData"))
