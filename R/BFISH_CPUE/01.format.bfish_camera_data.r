@@ -6,6 +6,7 @@
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# Notes:
 # There are two drops per PSU which is the sampling unit
 # However, there are some PSUs that are not sampled on the same day
 # Need to link drop information to abundance (Max N)
@@ -161,12 +162,14 @@
 			  .[!(DROP_CD %in% c(missing_lengths))]
 
 	camera_dt = merge(BFISH_CAM_S,BFISH_CAM_C,by=c("DROP_CD"),all=TRUE) %>%
-						  # this next line drops 17 samples with bad PSUs
+						  # this next line drops samples with bad PSUs
 						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
 						  .[,depth_strata:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<200,"S",ifelse(Depth_MEDIAN_m<300,"M",ifelse(Depth_MEDIAN_m<400,"D","ZZ"))))] %>%
 						  .[,depth_strata_2020:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<110,"D1",ifelse(Depth_MEDIAN_m<170,"D2",ifelse(Depth_MEDIAN_m<200,"D3",ifelse(Depth_MEDIAN_m<330,"D4",ifelse(Depth_MEDIAN_m<400,"D5","ZZ"))))))] %>%
 						  .[,complexity:=ifelse(med_acr<4,"MA1",ifelse(med_acr<9,"MA2","MA3"))] %>%
 						  .[,hardness:=ifelse(BS_pct_over_136j<0.24,"HB1",ifelse(BS_pct_over_136j<0.46,"HB2","HB3"))] %>%
+						  .[!is.na(PSU)] %>%
+						  .[!(depth_strata%in%c("Z","ZZ"))] %>%
 						  .[is.na(APRU),APRU:=0] %>%
 						  .[is.na(ETCA),ETCA:=0] %>%
 						  .[is.na(ETCO),ETCO:=0] %>%

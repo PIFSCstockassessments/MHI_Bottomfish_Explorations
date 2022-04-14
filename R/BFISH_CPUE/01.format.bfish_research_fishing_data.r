@@ -108,10 +108,10 @@
 			  # .[,SPECIES_GRP:="Deep7"] %>%
 			  # .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP"), SPECIES_GRP:="Other"]
 	samples_missing_bait = unique(BFISH_C[is.na(BAIT_CD)]$SAMPLE_ID)
-	# exclude 15 samples where bait was missing for recorded fish
+	# exclude samples where bait was missing for recorded fish
 	BFISH_C_long = copy(BFISH_C)
 	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))] %>%
-			   # exclude 10 samples where lengths are missing
+			   # exclude samples where lengths are missing
 			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
 			  # keep only biomass measurement
@@ -126,7 +126,7 @@
 
 
 	research_fishing_dt = merge(BFISH_S,BFISH_D,by=c("BFISH","SAMPLE_ID")) %>%
-						  # this next line drops 17 samples with bad PSUs
+						  # this next line drops samples with bad PSUs
 						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
 						  .[,depth_strata:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<200,"S",ifelse(Depth_MEDIAN_m<300,"M",ifelse(Depth_MEDIAN_m<400,"D","ZZ"))))] %>%
 						  .[,depth_strata_2020:=ifelse(Depth_MEDIAN_m<75,"Z",ifelse(Depth_MEDIAN_m<110,"D1",ifelse(Depth_MEDIAN_m<170,"D2",ifelse(Depth_MEDIAN_m<200,"D3",ifelse(Depth_MEDIAN_m<330,"D4",ifelse(Depth_MEDIAN_m<400,"D5","ZZ"))))))] %>%
@@ -163,9 +163,9 @@
 	tmp_dt$BAIT_CD = "F"
 	research_fishing_dt = rbind(research_fishing_dt,tmp_dt) %>%
 						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID","BAIT_CD"),all=TRUE) %>%
-						  # this next line drops 14 samples with missing PSUs
+						  # this next line drops samples with missing PSUs
 						  .[!is.na(PSU)] %>%
-						  # drops 8 PSUs outside of EFH 75-400m
+						  # drops PSUs outside of EFH 75-400m
 						  .[!(depth_strata%in%c("Z","ZZ"))] %>%
 						  .[is.na(APRU),APRU:=0] %>%
 						  .[is.na(ETCA),ETCA:=0] %>%
