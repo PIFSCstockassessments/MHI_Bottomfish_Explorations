@@ -133,7 +133,7 @@
 	missing_lengths = unique(BFISH_CAM_C[Length_category == "Unknown"]$DROP_CD)
 
 	BFISH_CAM_C = BFISH_CAM_C %>%
-			  .[,.(N=sum(N,na.rm=TRUE),STD_N=sum(N,na.rm=TRUE),KG=sum(KG,na.rm=TRUE),STD_KG=sum(STD_KG,na.rm=TRUE)),by=.(BFISH,DROP_CD,SPECIES_CD,Length_category)] %>%
+			  .[,.(N=sum(N,na.rm=TRUE),STD_N=sum(N,na.rm=TRUE),KG=sum(KG,na.rm=TRUE),STD_KG=sum(STD_KG,na.rm=TRUE)),by=.(DROP_CD,SPECIES_CD,Length_category)] %>%
 			  # keep only exploitable "sized" biomass
 			  .[Length_category=="Exploitable"] %>%
 			  .[,.(DROP_CD,SPECIES_CD,N,KG,STD_N,STD_KG)]
@@ -154,8 +154,8 @@
 			  .[,YEAR:=format(SAMPLE_DATE,format="%Y")] %>%
 			  .[,MONTH:=format(SAMPLE_DATE,format="%m")] %>%
 			  .[,DAY:=format(SAMPLE_DATE,format="%m")] %>%
-			  .[,JD:=format(SAMPLE_DATE,format="%j")] %>%
-			  .[,YEAR_continuous:=as.numeric(YEAR)+(as.numeric(JD)-1)/366] %>%
+			  .[,JD:=as.numeric(format(SAMPLE_DATE,format="%j"))] %>%
+			  .[,YEAR_continuous:=as.numeric(YEAR)+(JD-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction] %>%
 			  .[,.(DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]  %>%
 			  .[!(DROP_CD %in% dark_drops)] %>%
