@@ -61,6 +61,8 @@
 					   .[,gear_type:="research_fishing"] %>%
 					   .[,season:="fall"] %>%
 					   .[MONTH %in% c("02","03"),season:="spring"] %>%
+					   # anonymize vessel designation
+					   .[,VESSEL:=LETTERS[as.numeric(as.factor(VESSEL))]] %>%
 					   # rename variables
 					   setnames(.,c("SAMPLE_ID",
 					   				"PSU","Island","STRATA","STRATA_2020","substrate","slope","depth_strata","depth_strata_2020","complexity","hardness",
