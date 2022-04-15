@@ -17,10 +17,6 @@
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 	setwd(proj.dir)
-	source("D:/HOME/SAP/Code/Utilities/turbo.r")
-
-	plot_dir = paste0(proj.dir,"Plot/BFISH_CPUE/")
-	dir.create(plot_dir,recursive=TRUE,showWarnings=FALSE)
 
 #_____________________________________________________________________________________________________________________________
 # define helper function for converting DRIFT_START_TIME & DRIFT_END_TIME to 0-24 decimal

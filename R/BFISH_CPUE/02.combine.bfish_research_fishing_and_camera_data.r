@@ -15,8 +15,6 @@
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 	setwd(proj.dir)
-	source("D:/HOME/SAP/Code/Utilities/turbo.r")
-
 
 #_____________________________________________________________________________________________________________________________
 # bring in data
