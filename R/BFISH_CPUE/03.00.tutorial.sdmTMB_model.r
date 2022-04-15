@@ -71,7 +71,7 @@
 		A = proc.time()
 		mesh_boundary = INLA::inla.nonconvex.hull(cbind(psu_table$lon_eqd, psu_table$lat_eqd), convex = -0.005,resolution=205)
 		B = proc.time()
-		print(paste0("mesh boundary took ",(B-A)[3]," seconds to generate"))
+		print(paste0("mesh boundary took ",round((B-A)[3],digits=2)," seconds to generate"))
 		# in inla.mesh.2d the max.n.strict argument restricts the number of knots more than setting max.n. However, the cutoff distance between knots is what really controls the number of knots.
 		# for this example leave cutoff == 7.5 (in km) to keep the number of knots manageable, but for full analysis can decrease to << 4.
 		mesh_inla = INLA::inla.mesh.2d(loc = psu_sp_eqd,boundary = mesh_boundary,max.n.strict=c(500,16),cutoff=7.5)
@@ -123,4 +123,4 @@
 	  family = tweedie(link = "log"))
 	B = proc.time()
 	B-A
-	print(paste0((B-A)[3]," seconds to fit spatiotemporal model"))
+	print(paste0(round((B-A)[3],digits=2)," seconds to fit spatiotemporal model"))
