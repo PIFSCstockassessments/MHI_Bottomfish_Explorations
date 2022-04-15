@@ -95,7 +95,7 @@
 
 	# PSU specific information
 	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
-				.[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
+				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
 				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
 				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
 
