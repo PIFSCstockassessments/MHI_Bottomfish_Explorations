@@ -6,9 +6,9 @@
 # 1) Bring data (including spatial data)
 # 2) Set-up barrier mesh (including conversion to equal distant projection)
 # 3) Fit single species (e.g. prfi - Opakapaka) model using Tweedie distribution
-# 4) Examine diagnostics
+# 4) Examine diagnostics & estimated output
 # 5) Make predictions
-# 6)
+# 6) Calculate index
 
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
