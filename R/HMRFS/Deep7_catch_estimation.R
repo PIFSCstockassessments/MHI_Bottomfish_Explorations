@@ -14,7 +14,7 @@ species_df = data.frame("key" = c(8835020413, 8835360304, 8835360302, 8835360704
                         "beta" = c(3.065*10^-5, 6.005*10^-5, 1.551*10^-5, 2.311*10^-5, 2.243*10^-5, 1.298*10^-4, 3.526*10^-5))
 
 # for mode: 1 = private boat, 2 = shore
-# for area: 1 = ocean (> 3 MI), 2 = ocean (<= 3 mi), 3 = inland
+# for area: 1 = ocean (> 3 mi), 2 = ocean (<= 3 mi), 3 = inland
 # for disposition: index 1 = sold, 2 = not sold
 i1$mode = ifelse(i1$MODE_F == 8, 1, ifelse(i1$MODE_FX %in% 1:5, 2, NA))
 i1$area_exp = ifelse(i1$AREA_X == 2, 1, ifelse(i1$AREA_X == 1, 2, ifelse(i1$AREA_X == 5, 3, NA)))
@@ -23,11 +23,12 @@ observed_catch$sold = ifelse(observed_catch$DISP3 == 5, T, F)
 unavailable_catch = unavailable_catch[unavailable_catch$DISPO %in% c(3, 4, 5) & unavailable_catch$MODE_F != 7,] # fish that were not released and not from a charter trip
 unavailable_catch$sold = ifelse(unavailable_catch$DISPO == 5, T, F)
 
-observed_catch$EST_WGT = sapply(1:nrow(observed_catch), function(r) {
-  sp = observed_catch[r,]$SP_CODE
-  if((sp %in% species_df$key) && !is.nan(observed_catch[r,]$LNGTH) && is.nan(observed_catch[r,]$WGT)) { # bottomfish with length, but no weight
-    i = which(species_df$key == observed_catch[r,]$SP_CODE)
-    return(species_df[i,]$beta * (observed_catch[r,]$LNGTH / 10) ^ species_df[i,]$alpha)
+observed_catch$EST_WGT = sapply(1:nrow(observed_catch), function(f) {
+  r = observed_catch[f,]
+  sp = r$SP_CODE
+  if((sp %in% species_df$key) && !is.nan(r$LNGTH) && is.nan(r$WGT)) { # bottomfish with length, but no weight
+    i = which(species_df$key == r$SP_CODE)
+    return(species_df[i,]$beta * (r$LNGTH / 10) ^ species_df[i,]$alpha)
   } else {
     return(NaN)
   }
@@ -36,25 +37,28 @@ observed_catch$EST_WGT = sapply(1:nrow(observed_catch), function(r) {
 years = sort(unique(c(observed_catch$YEAR, unavailable_catch$year)), decreasing = F)
 trips = unique(i1[!is.na(i1$mode) & !is.na(i1$ID_CODE),]$ID_CODE)
 
+n_years = length(years)
 n_waves = 6
+n_species = nrow(species_df)
 n_modes = 2
 n_areas = 3
+n_trips = length(trips)
 n_dispositions = 2
 
-num_weighed = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-num_estimated = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-num_caught_by_trip = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas, length(trips)))
-anglers_by_trip = array(0, dim = c(length(years), n_waves, n_modes, n_areas, length(trips)))
-total_weight = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-observed_total_caught = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas, n_dispositions))
-unavailable_total_caught = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas, n_dispositions))
-mean_weight_wave = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-mean_weight_year = array(0, dim = c(length(years), nrow(species_df), n_modes, n_areas))
-num_trips = array(0, dim = c(length(years), n_waves, n_modes, n_areas))
-catch_rate = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-catch_rate_var = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
+num_weighed = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+num_estimated = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
+total_weight = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+observed_caught_by_trip = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_trips))
+observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
+unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
+mean_weight_wave = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+mean_weight_year = array(0, dim = c(n_years, n_species, n_modes, n_areas))
+num_trips = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
+catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 
-for(y in 1:length(years)) {
+for(y in 1:n_years) {
   for(w in 1:n_waves) {
     for(m in 1:n_modes) {
       for(a in 1:n_areas) {
@@ -64,15 +68,15 @@ for(y in 1:length(years)) {
   }
 }
 
-for(i in 1:length(trips)) {
-  trip = trips[i]
+for(t in 1:n_trips) {
+  trip = trips[t]
   year = as.numeric(substr(trip, 6, 9))
   y = which(years == year)
   w = ceiling(as.numeric(substr(trip, 10, 11)) / 2)
   m = i1[i1$ID_CODE == trip,]$mode
   a = i1[i1$ID_CODE == trip,]$area_exp
   
-  anglers_by_trip[y, w, m, a, i] = max(c(i1[i1$ID_CODE == trip,]$CNTRBTRS, observed_catch[observed_catch$ID_CODE == trip,]$CNTRBTRS, unavailable_catch[unavailable_catch$ID_CODE == trip,]$CNTRBTRS))
+  anglers_by_trip[y, w, m, a, t] = max(c(i1[i1$ID_CODE == trip,]$CNTRBTRS, observed_catch[observed_catch$ID_CODE == trip,]$CNTRBTRS, unavailable_catch[unavailable_catch$ID_CODE == trip,]$CNTRBTRS))
   
   # observed catch
   # FSHINSP is the number of specimens of a species observed
@@ -87,12 +91,12 @@ for(i in 1:length(trips)) {
     species = species[species %in% species_df$key]
     
     if(length(species) > 0) {
-      for(j in 1:length(species)) {
-        s = which(species_df$key == species[j])
+      for(i in 1:length(species)) {
+        s = which(species_df$key == species[i])
         
-        observed_s = observed[observed$SP_CODE == species[j],]
+        observed_s = observed[observed$SP_CODE == species[i],]
         
-        num_caught_by_trip[y, w, s, m, a, i] = num_caught_by_trip[y, w, s, m, a, i] + max(observed_s$FSHINSP)
+        observed_caught_by_trip[y, w, s, m, a, t] = max(observed_s$FSHINSP)
         
         if(all(observed_s$sold)) {
           observed_total_caught[y, w, s, m, a, 1] = observed_total_caught[y, w, s, m, a, 1] + max(observed_s$FSHINSP)
@@ -105,8 +109,8 @@ for(i in 1:length(trips)) {
           count_sold = 0
           count_unsold = 0
           
-          for(k in 1:nrow(observed_s)) {
-            r = observed_s[k,]
+          for(j in 1:nrow(observed_s)) {
+            r = observed_s[j,]
             if(r$sold) {
               count_sold = count_sold + 1
             } else {
@@ -118,8 +122,8 @@ for(i in 1:length(trips)) {
           }
         }
         
-        for(k in 1:nrow(observed_s)) {
-          r = observed_s[k,]
+        for(j in 1:nrow(observed_s)) {
+          r = observed_s[j,]
           
           if(!is.nan(r$WGT)) {
             num_weighed[y, w, s, m, a] = num_weighed[y, w, s, m, a] + 1
@@ -146,20 +150,20 @@ for(i in 1:length(trips)) {
     species = species[species %in% species_df$key]
     
     if(length(species) > 0) {
-      for(j in 1:length(species)) {
-        s = which(species_df$key == species[j])
+      for(i in 1:length(species)) {
+        s = which(species_df$key == species[i])
         
-        r = unavailable[unavailable$SP_CODE == species[j],]
+        unavailable_s = unavailable[unavailable$SP_CODE == species[i],]
         
         # There is an instance of two rows for the same specie within a single trip (ID_CODE = 1701620190402001, SP_CODE = 8835360704). The below code counts both rows, each with 7 fish.
-        for(k in 1:nrow(r)) {
-          q = r[k,]
-          num_caught_by_trip[y, w, s, m, a, i] = num_caught_by_trip[y, w, s, m, a, i] + q$NUM_FISH
+        for(j in 1:nrow(unavailable_s)) {
+          r = unavailable_s[j,]
+          observed_caught_by_trip[y, w, s, m, a, t] = r$NUM_FISH
           
-          if(q$sold) {
-            unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + q$NUM_FISH
+          if(r$sold) {
+            unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + r$NUM_FISH
           } else {
-            unavailable_total_caught[y, w, s, m, a, 2] = unavailable_total_caught[y, w, s, m, a, 2] + q$NUM_FISH
+            unavailable_total_caught[y, w, s, m, a, 2] = unavailable_total_caught[y, w, s, m, a, 2] + r$NUM_FISH
           }
         }
       }
@@ -167,22 +171,26 @@ for(i in 1:length(trips)) {
   }
 }
 
-for(i in 1:nrow(species_df)) {
-  mean_weight_wave[, , i, , ] = total_weight[, , i, , ] / (num_weighed[, , i, , ] + num_estimated[, , i, , ])
-  mean_weight_year[, i, , ] = apply(total_weight[, , i, , ], c(1, 3, 4), sum) / apply(num_weighed[, , i, , ] + num_estimated[, , i, , ], c(1, 3, 4), sum)
-  catch_rate[, , i, , ] = apply(observed_total_caught[, , i, , , ] + unavailable_total_caught[, , i, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum)
+for(s in 1:n_species) {
+  mean_weight_wave[, , s, , ] = total_weight[, , s, , ] / (num_weighed[, , s, , ] + num_estimated[, , s, , ])
+  mean_weight_year[, s, , ] = apply(total_weight[, , s, , ], c(1, 3, 4), sum) / apply(num_weighed[, , s, , ] + num_estimated[, , s, , ], c(1, 3, 4), sum)
+  catch_rate[, , s, , ] = apply(observed_total_caught[, , s, , , ] + unavailable_total_caught[, , s, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum)
 }
-catch_rate[18, 3, , , ] = catch_rate[17, 3, , , ] # No data available for April - June 2020
+catch_rate[18, 3, , , ] = catch_rate[17, 3, , , ] # No data available for April - June 2020, so use previous year
+catch_rate[is.na(catch_rate)] = 0
 
-for(i in 1:length(years)) {
-  for(j in 1:n_waves) {
-    for(k in 1:nrow(species_df)) {
-      for(l in 1:n_modes) {
-        for(m in 1:n_areas) {
-          x = num_caught_by_trip[i, j, k, l, m, ]
-          y = anglers_by_trip[i, j, l, m, ]
+for(y in 1:n_years) {
+  for(w in 1:n_waves) {
+    for(s in 1:n_species) {
+      for(m in 1:n_modes) {
+        for(a in 1:n_areas) {
+          unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
+          unavailable_catch_rate_var = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2) / (num_trips[y, w, m, a] - 1)
           
-          catch_rate_var[i, j, k, l, m] = (mean(x) / mean(y)) ^ 2 * (var(x) / mean(x) ^ 2 - 2 * cov(x, y) / (mean(x) * mean(y)) + var(y) / (mean(y)) ^ 2)
+          observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, ])
+          observed_catch_rate_var = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
+
+          catch_rate_var[y, w, s, m, a] = unavailable_catch_rate_var + observed_catch_rate_var
         }
       }
     }
@@ -197,21 +205,21 @@ effort_df$Wave_num = as.numeric(effort_df$Wave)
 effort_df$mode = ifelse(effort_df$Fishing.Mode == "PRIVATE/RENTAL BOAT", 1, ifelse(effort_df$Fishing.Mode == "SHORE", 2, NA))
 effort_df$area = ifelse(effort_df$Fishing.Area == "OCEAN (> 3 MI)", 1, ifelse(effort_df$Fishing.Area == "OCEAN (<= 3 MI)", 2, ifelse(effort_df$Fishing.Area == "INLAND", 3, NA)))
 
-effort = array(0, dim = c(length(years), n_waves, n_modes, n_areas))
-effort_var = array(0, dim = c(length(years), n_waves, n_modes, n_areas))
-for(i in 1:length(years)) {
-  for(j in 1:n_waves) {
-    for(k in 1:n_modes) {
-      for(l in 1:n_areas) {
-        rows = effort_df[effort_df$Year == years[i] & effort_df$Wave_num == j & effort_df$mode == k & effort_df$area == l,]
+effort = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
+effort_var = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
+for(y in 1:n_years) {
+  for(w in 1:n_waves) {
+    for(m in 1:n_modes) {
+      for(a in 1:n_areas) {
+        rows = effort_df[effort_df$Year == years[y] & effort_df$Wave_num == w & effort_df$mode == m & effort_df$area == a,]
         
         if(nrow(rows) > 0) {
-          effort[i, j, k, l] = sum(rows$Angler.Trips)
+          effort[y, w, m, a] = sum(rows$Angler.Trips)
           
-          for(r in 1:nrow(rows)) {
-            row = rows[r,]
+          for(i in 1:nrow(rows)) {
+            r = rows[i,]
             
-            effort_var[i, j, k, l] = effort_var[i, j, k, l] + (row$Angler.Trips  * row$PSE / 100) ^ 2
+            effort_var[y, w, m, a] = effort_var[y, w, m, a] + (r$Angler.Trips  * r$PSE / 100) ^ 2
           }
         }
       }
@@ -221,11 +229,11 @@ for(i in 1:length(years)) {
 
 # total catch
 
-total_catch_num = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-total_catch_num_var = array(0, dim = c(length(years), n_waves, nrow(species_df), n_modes, n_areas))
-for(i in 1:nrow(species_df)) {
-  total_catch_num[, , i, , ] = catch_rate[, , i, , ] * effort
-  total_catch_num_var[, , i, , ] = catch_rate_var[, , i, , ] * effort ^ 2 + effort_var * catch_rate[, , i, , ] ^ 2 - catch_rate_var[, , i, , ] * effort_var
+total_catch_num = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+total_catch_num_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+for(s in 1:n_species) {
+  total_catch_num[, , s, , ] = catch_rate[, , s, , ] * effort
+  total_catch_num_var[, , s, , ] = catch_rate_var[, , s, , ] * effort ^ 2 + effort_var * catch_rate[, , s, , ] ^ 2 - catch_rate_var[, , s, , ] * effort_var
 }
 
 total_catch_num_var_annual = apply(total_catch_num_var, c(1, 3, 4, 5), sum)
@@ -246,24 +254,24 @@ official_catch$Total.Harvest..A.B1. = as.numeric(gsub(",", "", official_catch$To
 official_catch_num = array(0, dim = c(length(years), nrow(species_df)))
 official_catch_num_var = array(0, dim = c(length(years), nrow(species_df)))
 
-for(i in 1:length(years)) {
-  for(j in 1:nrow(species_df)) {
-    rows = official_catch[official_catch$Year == years[i] & official_catch$Common.Name == species_df$common_name[j],]
+for(y in 1:n_years) {
+  for(s in 1:n_species) {
+    rows = official_catch[official_catch$Year == years[y] & official_catch$Common.Name == species_df$common_name[s],]
     
     if(nrow(rows) > 0) {
-      official_catch_num[i, j] = sum(rows$Total.Harvest..A.B1.)
+      official_catch_num[y, s] = sum(rows$Total.Harvest..A.B1.)
       
-      for(r in 1:nrow(rows)) {
-        row = rows[r,]
+      for(i in 1:nrow(rows)) {
+        r = rows[i,]
         
-        official_catch_num_var[i, j] = official_catch_num_var[i, j] + (row$Total.Harvest..A.B1.  * row$PSE / 100) ^ 2
+        official_catch_num_var[y, s] = official_catch_num_var[y, s] + (r$Total.Harvest..A.B1.  * r$PSE / 100) ^ 2
       }
     }
   }
 }
-for(i in 1:nrow(species_df)) {
-  plot(x = years, y = official_catch_num[, i], type = "l", xlab = "Year", ylab = paste0(species_df[i,]$hawaiian_name, " Catch"))
-  lines(x = years, y = apply(total_catch_num[, , i, , ], c(1), sum), col = "red")
+for(s in 1:n_species) {
+  plot(x = years, y = official_catch_num[, s], type = "l", xlab = "Year", ylab = paste0(species_df[s,]$hawaiian_name, " Catch"))
+  lines(x = years, y = apply(total_catch_num[, , s, , ], c(1), sum), col = "red")
   legend(x = "topright", col = c("black", "red"), lty = 1, legend = c("HMRFS", "Me"), bty = "n")
 }
 
