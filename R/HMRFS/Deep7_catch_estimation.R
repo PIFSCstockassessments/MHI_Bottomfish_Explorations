@@ -3,9 +3,9 @@ t1 = Sys.time()
 library(sas7bdat)
 
 setwd("/Users/Toby/Documents/GitHub/MHI_Bottomfish_2023/R/HMRFS")
-i1 = read.sas7bdat("./MRIP_Ifiles_HI/i1.sas7bdat", debug=TRUE)
-observed_catch = read.sas7bdat("./MRIP_Ifiles_HI/i3.sas7bdat", debug=TRUE)
-unavailable_catch = read.sas7bdat("./MRIP_Ifiles_HI/i2.sas7bdat", debug=TRUE)
+i1 = read.sas7bdat("./MRIP_Ifiles_HI/i1.sas7bdat", debug = TRUE)
+observed_catch = read.sas7bdat("./MRIP_Ifiles_HI/i3.sas7bdat", debug = TRUE)
+unavailable_catch = read.sas7bdat("./MRIP_Ifiles_HI/i2.sas7bdat", debug = TRUE)
 
 species_df = data.frame("key" = c(8835020413, 8835360304, 8835360302, 8835360704, 8835360706, 8835360901, 8835360707),
                         "common_name" = c("HAWAIIAN GROUPER", "LONGTAILED RED SNAPPER", "RUBY SNAPPER", "PINK SNAPPER", "VON SIEBOLDS SNAPPER", "IRONJAW SNAPPER", "BINGHAMS SNAPPER"),
@@ -269,6 +269,7 @@ for(y in 1:n_years) {
     }
   }
 }
+
 for(s in 1:n_species) {
   plot(x = years, y = official_catch_num[, s], type = "l", xlab = "Year", ylab = paste0(species_df[s,]$hawaiian_name, " Catch"))
   lines(x = years, y = apply(total_catch_num[, , s, , ], c(1), sum), col = "red")
