@@ -100,27 +100,28 @@ for(t in 1:n_trips) {
         
         if(all(observed_s$sold)) {
           observed_total_caught[y, w, s, m, a, 1] = observed_total_caught[y, w, s, m, a, 1] + max(observed_s$FSHINSP)
-        } else if(all(!observed$sold)) {
+        } else if(any(!observed$sold)) {
           observed_total_caught[y, w, s, m, a, 2] = observed_total_caught[y, w, s, m, a, 2] + max(observed_s$FSHINSP)
-        } else {
+        } 
+#        else {
           # there are 7 instances where there are multiple dispositions within the same interview/species
           # in each case there is a row for each fish caught, but this could potentially not be the case
           # e.g. ID_CODE = 1700920031105001, SP_CODE = 8835360704
-          count_sold = 0
-          count_unsold = 0
+#          count_sold = 0
+#          count_unsold = 0
           
-          for(j in 1:nrow(observed_s)) {
-            r = observed_s[j,]
-            if(r$sold) {
-              count_sold = count_sold + 1
-            } else {
-              count_unsold = count_unsold + 1
-            }
+#          for(j in 1:nrow(observed_s)) {
+#            r = observed_s[j,]
+#            if(r$sold) {
+#              count_sold = count_sold + 1
+#            } else {
+#              count_unsold = count_unsold + 1
+#            }
             
-            observed_total_caught[y, w, s, m, a, 1] = observed_total_caught[y, w, s, m, a, 1] + max(observed_s$FSHINSP) * count_sold / (count_sold + count_unsold)
-            observed_total_caught[y, w, s, m, a, 2] = observed_total_caught[y, w, s, m, a, 2] + max(observed_s$FSHINSP) * count_unsold / (count_sold + count_unsold)
-          }
-        }
+#            observed_total_caught[y, w, s, m, a, 1] = observed_total_caught[y, w, s, m, a, 1] + max(observed_s$FSHINSP) * count_sold / (count_sold + count_unsold)
+#            observed_total_caught[y, w, s, m, a, 2] = observed_total_caught[y, w, s, m, a, 2] + max(observed_s$FSHINSP) * count_unsold / (count_sold + count_unsold)
+#          }
+#        }
         
         for(j in 1:nrow(observed_s)) {
           r = observed_s[j,]
@@ -155,6 +156,12 @@ for(t in 1:n_trips) {
         
         unavailable_s = unavailable[unavailable$SP_CODE == species[i],]
         
+        #observed_caught_by_trip[y, w, s, m, a, t] = max(unavailable_s$NUM_FISH)
+        #if(all(unavailable_s$sold)) {
+        #  unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + max(unavailable_s$NUM_FISH)
+        #} else if(any(unavailable_s$sold)) {
+        #  unavailable_total_caught[y, w, s, m, a, 2] = unavailable_total_caught[y, w, s, m, a, 2] + max(unavailable_s$NUM_FISH)
+        #}
         # There is an instance of two rows for the same specie within a single trip (ID_CODE = 1701620190402001, SP_CODE = 8835360704). The below code counts both rows, each with 7 fish.
         for(j in 1:nrow(unavailable_s)) {
           r = unavailable_s[j,]
