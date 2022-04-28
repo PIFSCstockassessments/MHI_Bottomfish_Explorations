@@ -1,35 +1,3 @@
-num_weighed = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-num_estimated = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-n = num_weighed + num_estimated
-
-total_weight = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-
-mean_weight_wave = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-mean_weight_year = array(0, dim = c(n_years, n_species, n_modes, n_areas))
-# for mode: 1 = private boat, 2 = shore
-# for area: 1 = ocean (> 3 mi), 2 = ocean (<= 3 mi), 3 = inland
-
-species_df = data.frame("key" = c(8835020413, 8835360304, 8835360302, 8835360704, 8835360706, 8835360901, 8835360707),
-                        "common_name" = c("HAWAIIAN GROUPER", "LONGTAILED RED SNAPPER", "RUBY SNAPPER", "PINK SNAPPER", "VON SIEBOLDS SNAPPER", "IRONJAW SNAPPER", "BINGHAMS SNAPPER"),
-                        "hawaiian_name" = c("Hapu'upu'u", "Onaga", "Ehu", "Opakapaka", "Kalekale", "Lehi", "Gindai"),
-                        "alpha" = c(2.884, 2.673, 3.026, 2.928, 2.932, 2.458, 2.859), # cm
-                        "beta" = c(3.065*10^-5, 6.005*10^-5, 1.551*10^-5, 2.311*10^-5, 2.243*10^-5, 1.298*10^-4, 3.526*10^-5))
-
-
-mean_weight_wave[, , s, , ] = total_weight[, , s, , ] / (num_weighed[, , s, , ] + num_estimated[, , s, , ])
-mean_weight_year[, s, , ] = apply(total_weight[, , s, , ], c(1, 3, 4), sum) / apply(num_weighed[, , s, , ] + num_estimated[, , s, , ], c(1, 3, 4), sum)
-
-
-
-
-observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-
-a = observed_total_caught + unavailable_total_caught
-a = apply(a, c(1, 3, 6), sum)
-a[, , 1] / apply(a, c(1, 2), sum)
-
-
 # Weight data points by species/year
 
 cols = c("black", "deeppink", "deepskyblue", "blueviolet", "lawngreen")
@@ -58,11 +26,11 @@ for(s in 1:nrow(species_df)) {
   axis(side = 2, at = pretty(y_min:y_max, n = 4), las = 2)
   lines(x = c(x_min, x_min), y = c(y_min, y_max))
   mtext("Year", side = 1, line = 3)
-  mtext("Weight (kg)", side = 2, line = 3)
+  mtext("Weight ± SE (kg)", side = 2, line = 3)
   mtext(species_df$hawaiian_name[s], side = 3, line = 1)
   
   w_sy_mean = array(NA, dim = c(length(years)))
-  w_sy_sd = array(NA, dim = c(length(years)))
+  w_sy_se = array(NA, dim = c(length(years)))
   
   for(y in 1:length(years)) {
     w_sy = w_s[w_s$YEAR == years[y],]
@@ -73,8 +41,8 @@ for(s in 1:nrow(species_df)) {
       w_sy_mean[y] = mean(w_sy$WGT, na.rm = T)
       
       if(nrow(w_sy) > 1) {
-        w_sy_sd[y] = sqrt(var(w_sy$WGT, na.rm = T))
-        lines(x = c(years[y], years[y]), y = c(w_sy_mean[y] - w_sy_sd[y], w_sy_mean[y] + w_sy_sd[y]), col = rgb(0, 0, 0, alpha = 0.5))
+        w_sy_se[y] = sqrt(var(w_sy$WGT[!is.na(w_sy$WGT)]) / length(w_sy$WGT[!is.na(w_sy$WGT)]))
+        lines(x = c(years[y], years[y]), y = c(w_sy_mean[y] - w_sy_se[y], w_sy_mean[y] + w_sy_se[y]), col = rgb(0, 0, 0, alpha = 0.5))
       }
     }
   }
@@ -91,10 +59,48 @@ for(s in 1:nrow(species_df)) {
 
 # CPUE by species/year
 
+cols = c("black", "deeppink", "deepskyblue", "blueviolet", "lawngreen")
+transparent_cols = array("", dim = c(length(cols)))
+for(i in 1:length(cols)) {
+  col_rgb = col2rgb(cols[i])
+  transparent_cols[i] = rgb(col_rgb[1] / 255, col_rgb[2] / 255, col_rgb[3] / 255, alpha = 0.7)
+}
 
-catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
+x_min = min(years)
+x_max = max(years)
 
-catch_rate[, , s, , ] = apply(observed_total_caught[, , s, , , ] + unavailable_total_caught[, , s, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum)
+par(xpd = NA, mar = c(4, 4, 3, 1))
+
+for(s in 1:nrow(species_df)) {
+  catch_rate_sy = sapply(1:length(years), function(f) sum(observed_total_caught[f, , s, , , ] + unavailable_total_caught[f, , s, , , ]) / sum(anglers_by_trip[f, , , ,]))
+  catch_rate_se_sy = sapply(1:length(years), function(f) sqrt(sum(catch_rate_var[f, , s, , ], na.rm = T) / sum(num_trips[f, , , ])))
+  
+  y_ticks = pretty(c(0, max(catch_rate_sy)), n = 4)
+  y_max = max(y_ticks)
+  y_min = 0
+  
+  plot(NA, axes = F, xaxs = "i", yaxs = "i", xlim = c(x_min, x_max), ylim = c(y_min, y_max), xlab = "", ylab = "")
+  axis(side = 1, at = seq(from = 2005, to = 2020, by = 5))
+  lines(x = c(x_min, x_max), y = c(y_min, y_min))
+  axis(side = 2, at = y_ticks[y_ticks >= 0], las = 2)
+  lines(x = c(x_min, x_min), y = c(y_min, y_max))
+  mtext("Year", side = 1, line = 3)
+  mtext("CPUE (# / Angler Trip)", side = 2, line = 3)
+  mtext(species_df$hawaiian_name[s], side = 3, line = 1)
+  
+  w_sy_mean = array(NA, dim = c(length(years)))
+  w_sy_sd = array(NA, dim = c(length(years)))
+  
+  points(x = years[!is.na(catch_rate_sy)], y = catch_rate_sy[!is.na(catch_rate_sy)], col = cols[3])
+  
+  for(y in 1:length(years)) {
+    lines(x = c(years[y], years[y]), y = c(catch_rate_sy[y] - catch_rate_se_sy[y], catch_rate_sy[y] + catch_rate_se_sy[y]), col = transparent_cols[3])
+  }
+  
+  lines(x = years[!is.na(catch_rate_sy)], y = catch_rate_sy[!is.na(catch_rate_sy)])
+}
+
+
+
+
+
