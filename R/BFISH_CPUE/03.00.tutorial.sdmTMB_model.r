@@ -20,7 +20,7 @@
 	library(sdmTMB)
 	# rgdal functions sourced directly
 	# sp functions sourced directly
-
+	# DHARMa functions sourced directly
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
@@ -101,15 +101,20 @@
 	        new_idx_boundary = unique(new_idx_boundary)
 	        x_boundary = mesh_boundary$loc[t(new_idx_boundary), 1]
 	        y_boundary = mesh_boundary$loc[t(new_idx_boundary), 2] 
- 		
+ 			
+ 			normal_col = "black"
+ 			barrier_col = "gray70"
+ 			boundary_col = "hotpink"
+ 			land_col = "gray90"
+	 		
 	 		par(mar=c(5,5,1,1))
-			sp::plot(hi_coast_eqd,axes=TRUE,col="gray90",ylim=c(-300,300),xlab="Eastings (km)",ylab="Northings (km)",cex=1.5,cex.axis=1.5,cex.lab=1.5,las=1)
-			lines(x,y,col="red")
-			points(x,y,pch=16,cex=0.5,col="red")
-			lines(x_normal,y_normal,col="black")
-			lines(x_boundary,y_boundary,col="blue",lwd=3)
-			points(x_normal,y_normal,pch=16,cex=0.5,col="black")
-			legend("bottomleft",legend=c("normal knot","barrier knot","normal edge","barrier edge","knot boundary","land"),lwd=c(NA,NA,1,1,3,1),pch=c(16,16,NA,NA,NA,NA),col=c("black","red","black","red","blue",NA),fill=c(NA,NA,NA,NA,NA,"gray90"),border=c(NA,NA,NA,NA,NA,"black"),bty="n",cex=1.5)
+			sp::plot(hi_coast_eqd,axes=TRUE,col=land_col,ylim=c(-300,300),xlab="Eastings (km)",ylab="Northings (km)",cex=1.5,cex.axis=1.5,cex.lab=1.5,las=1)
+			lines(x,y,col=barrier_col)
+			points(x,y,pch=16,cex=0.5,col=barrier_col)
+			lines(x_normal,y_normal,col=normal_col)
+			lines(x_boundary,y_boundary,col=boundary_col,lwd=3)
+			points(x_normal,y_normal,pch=16,cex=0.5,col=normal_col)
+			legend("bottomleft",legend=c("normal knot","barrier knot","normal edge","barrier edge","knot boundary","land"),lwd=c(NA,NA,1,1,3,1),pch=c(16,16,NA,NA,NA,NA),col=c(normal_col,barrier_col,normal_col,barrier_col,boundary_col,NA),fill=c(NA,NA,NA,NA,NA,land_col),border=c(NA,NA,NA,NA,NA,"black"),bty="n",cex=1.5)
 
 #_____________________________________________________________________________________________________________________________
 # 3) fit a basic model
@@ -124,3 +129,41 @@
 	B = proc.time()
 	B-A
 	print(paste0(round((B-A)[3],digits=2)," seconds to fit spatiotemporal model"))
+
+#_____________________________________________________________________________________________________________________________
+# 4) Model diagnostics & plot output
+	# need to simulate responses to calculate DHARMa style residuals
+	# can use built in functions from sdmTMB package but DHARMa package has some built in tests/plots
+	set.seed(123)
+	sim_fit = simulate(fit, nsim = 500)
+	pred = fit$family$linkinv(predict(fit)$est)
+	residuals_dharma =  DHARMa::createDHARMa(simulatedResponse = sim_fit,observedResponse = bfish_df$weight_kg,fittedPredictedResponse = pred)	
+	# basic QQ & residual v. predicted plot
+		plot(residuals_dharma)
+	# residual v. predicted by model covariate
+		DHARMa::plotResiduals(residuals_dharma, form = as.factor(bfish_df$year))
+		DHARMa::plotResiduals(residuals_dharma, form = bfish_df$lon)
+		DHARMa::plotResiduals(residuals_dharma, form = bfish_df$lat)
+	# test for uniformity in residuals, overdispersion, outliers
+		DHARMa::testResiduals(residuals_dharma)
+	# test for zero inflation
+		DHARMa::testZeroInflation(residuals_dharma)
+	# test for spatial autocorrelation
+	# DHARMa::testSpatialAutocorrelation needs unique locations
+		bfish_df$spatial_group = as.numeric(as.factor(paste0(bfish_df$lon,"_",bfish_df$lat)))
+		spatial_group_dt = data.table(spatial_group=bfish_df$spatial_group,x=bfish_df$lon,y=bfish_df$lat) %>%
+					   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
+		residuals_spatial_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$spatial_group)	
+		DHARMa::testSpatialAutocorrelation(residuals_spatial_group, x = spatial_group_dt$x, y = spatial_group_dt$y)
+	# test for temporal autocorrelation
+		bfish_df$temporal_group = factor(bfish_df$year,levels=as.character(sort(unique(bfish_df$year))))
+		residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
+		DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
+		
+		bfish_df$temporal_group =factor(bfish_df$year_continuous,levels=as.character(sort(unique(bfish_df$year_continuous))))
+		residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
+		DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
+
+
+
+
