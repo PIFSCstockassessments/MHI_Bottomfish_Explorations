@@ -6,9 +6,11 @@
 # 1) Bring data (including spatial data)
 # 2) Set-up barrier mesh (including conversion to equal distant projection)
 # 3) Fit single species (e.g. prfi - Opakapaka) model using Tweedie distribution
-# 4) Examine diagnostics & estimated output
-# 5) Make predictions
+# 4) Examine diagnostics
+# 5) Make predictions on PSU grid & examine outputs
 # 6) Calculate index
+
+# This combines topics covered in sdmTMB vignettes (https://pbs-assess.github.io/sdmTMB/index.html)
 
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -18,9 +20,12 @@
 	library(data.table)
 	library(magrittr)
 	library(sdmTMB)
+	library(ggplot2)
 	# rgdal functions sourced directly
 	# sp functions sourced directly
 	# DHARMa functions sourced directly
+	# sf functions sourced directly
+	# ggthemes functions sourced directly
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
@@ -37,7 +42,7 @@
 				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
 	# needed for plotting and defining the barrier feature
 	hi_coast = rgdal::readOGR(dsn = paste0(proj.dir,"Data/GIS/Coastline"), layer = "Coastline")
-
+	hi_coast_sf = sf::st_as_sf(hi_coast)
 #_____________________________________________________________________________________________________________________________
 # 2) set-up spatial domain
 	# convert to equal distant projection
@@ -48,7 +53,7 @@
 	  	hi_coast_eqd = sp::spTransform(hi_coast, crs_eqd)
 	  	hi_coast_eqd_sf = sf::st_as_sf(hi_coast_eqd) 
 
-	# get equi-distant coordinates for samples & psu
+	# convert to equi-distant coordinates for samples & psu
 		bfish_coords = cbind(bfish_df$lon, bfish_df$lat)
 		bfish_sp = sp::SpatialPoints(bfish_coords)
 		sp::proj4string(bfish_sp) = crs_ll
@@ -97,7 +102,7 @@
 	        {
 	        	new_idx_boundary = rbind(new_idx_boundary,idx_boundary[non_consec_idx[i]:non_consec_idx[i+1],],c(idx_boundary[non_consec_idx[i+1],1],NA))
 	        }
-	        # remove duplicate indices
+	        # remove duplicate indices for plotting
 	        new_idx_boundary = unique(new_idx_boundary)
 	        x_boundary = mesh_boundary$loc[t(new_idx_boundary), 1]
 	        y_boundary = mesh_boundary$loc[t(new_idx_boundary), 2] 
@@ -117,7 +122,10 @@
 			legend("bottomleft",legend=c("normal knot","barrier knot","normal edge","barrier edge","knot boundary","land"),lwd=c(NA,NA,1,1,3,1),pch=c(16,16,NA,NA,NA,NA),col=c(normal_col,barrier_col,normal_col,barrier_col,boundary_col,NA),fill=c(NA,NA,NA,NA,NA,land_col),border=c(NA,NA,NA,NA,NA,"black"),bty="n",cex=1.5)
 
 #_____________________________________________________________________________________________________________________________
-# 3) fit a basic model
+# 3) fit a basic sdmTMB model
+# Error structure: Tweedie
+# Fixed effects: Year
+# Random effects: spatial + spatiotemporal
 	# this takes a few seconds
 	A = proc.time()
 	fit = sdmTMB(
@@ -164,6 +172,106 @@
 		residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
 		DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
 
+#_____________________________________________________________________________________________________________________________
+# 5) Make predictions across model domain (all PSUs across years)
+		# expand psu_table by year
+			psu_table.list = lapply(unique(bfish_df$year),function(x,dt){tmp=copy(dt)%>%.[,year:=x];return(tmp)},dt=psu_table)
+			psu_table_annual = rbindlist(psu_table.list)
+
+		# predict on annual psu table
+			predict_psu = predict(fit, newdata = psu_table_annual)
+			# conduct boot-strapping from joint precision matrix to get estimates of uncertainty
+			predict_sim = predict(fit, newdata = psu_table_annual, nsim=500)
+			predict_psu_sim = cbind(psu_table_annual,predict_sim) %>%
+							  melt(.,id.vars=colnames(psu_table_annual))
+
+		# plot estimated response
+			predict_psu %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x = lon_eqd, y = lat_eqd, color = exp(est)),size=0.05) +
+			geom_sf(data=hi_coast_eqd_sf,fill=land_col,alpha=0.5) +
+			ggthemes::theme_few(base_size=20) + 
+			viridis::scale_color_viridis("Est. response",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+
+		# plot estimated response uncertainty
+			predict_psu_sim %>% .[,.(mean=mean(exp(value)),sd=sd(exp(value))),by=.(year,lon_eqd,lat_eqd)] %>% .[,cv:=sd/mean] %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x = lon_eqd, y = lat_eqd, color = cv),size=0.05) +
+			geom_sf(data=hi_coast_eqd_sf,fill=land_col,alpha=0.5) +
+			ggthemes::theme_few(base_size=20) + 
+			viridis::scale_color_viridis("CV (response)",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="sqrt")
+
+		# Estimated fixed effects
+			predict_psu %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x = lon_eqd, y = lat_eqd, color = exp(est_non_rf)),size=0.05) +
+			geom_sf(data=hi_coast_eqd_sf,fill=land_col,alpha=0.5) +
+			ggthemes::theme_few(base_size=20) + 
+			viridis::scale_color_viridis("Est. fixed effects",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+
+		# Estimated spatial effects
+			predict_psu %>% .[,.(lon_eqd,lat_eqd,omega_s)] %>% unique(.) %>%
+			ggplot() + 
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x = lon_eqd, y = lat_eqd, color = omega_s),size=0.05) +
+			geom_sf(data=hi_coast_eqd_sf,fill=land_col,alpha=0.5) +
+			ggthemes::theme_few(base_size=20) + 
+			scale_color_gradient2("Est. spatial random effects",low="blue",high="red")
+
+		# Estimated spatiotemporal effects
+			predict_psu %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x = lon_eqd, y = lat_eqd, color = epsilon_st),size=0.05) +
+			geom_sf(data=hi_coast_eqd_sf,fill=land_col,alpha=0.5) +
+			ggthemes::theme_few(base_size=20) + 
+			scale_color_gradient2("Est. spatiotemporal random effects",low="blue",high="red")
+
+#_____________________________________________________________________________________________________________________________
+# 6) Calculate index
+		index_dt = predict_psu_sim %>% .[,.(value=mean(exp(value))),by=.(year,variable)] %>%
+							.[,.(est=quantile(value,probs=0.5),lwr=quantile(value,probs=0.025),upr=quantile(value,probs=0.975),log_est=mean(log(value)),se=sd(log(value))),by=year]
+		index_regional_dt = predict_psu_sim %>% .[,.(value=mean(exp(value))),by=.(year,Island,variable)] %>%
+							.[,.(est=quantile(value,probs=0.5),lwr=quantile(value,probs=0.025),upr=quantile(value,probs=0.975),log_est=mean(log(value)),se=sd(log(value))),by=.(year,Island)] %>%
+							.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))]
 
 
+		# plot index with log-normal error
+		index_dt %>%
+		ggplot() +
+		ggtitle("BFISH relative abundance: Opakapaka") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		xlab("Year") +
+		ylab("Avg. biomass (kg)") +
+		geom_ribbon(aes(x=as.numeric(year),ymin=lwr,ymax=upr),alpha=0.5) +
+		geom_path(aes(x=as.numeric(year),y=est),size=1.25) +
+		ggthemes::theme_few(base_size=20)
+
+		# plot regional indices with log-normal error
+		index_regional_dt %>%
+		ggplot() +
+		facet_wrap(~Island,scales="free_y") +
+		ggtitle("BFISH relative abundance: Opakapaka") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		xlab("Year") +
+		ylab("Avg. biomass (kg)") +
+		geom_ribbon(aes(x=as.numeric(year),ymin=lwr,ymax=upr,fill=Island),alpha=0.25) +
+		geom_path(aes(x=as.numeric(year),y=est,color=Island),size=1.25) +
+		viridis::scale_color_viridis("Island group",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete="TRUE") +
+		viridis::scale_fill_viridis("Island group",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete="TRUE") +
+		ggthemes::theme_few(base_size=20)
 
