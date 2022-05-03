@@ -245,7 +245,7 @@
 							.[,.(est=quantile(value,probs=0.5),lwr=quantile(value,probs=0.025),upr=quantile(value,probs=0.975),log_est=mean(log(value)),se=sd(log(value))),by=year]
 		index_regional_dt = predict_psu_sim %>% .[,.(value=mean(exp(value))),by=.(year,Island,variable)] %>%
 							.[,.(est=quantile(value,probs=0.5),lwr=quantile(value,probs=0.025),upr=quantile(value,probs=0.975),log_est=mean(log(value)),se=sd(log(value))),by=.(year,Island)] %>%
-							.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Niihau","Kauai","Oahu","Maui Nui","Hawaii"))]
+							.[,Island:=factor(Island,levels=c("Niihau","Kauai","Oahu","Maui Nui","Big Island"),labels=c("Ni'ihau","Kaua'i","O'ahu","Maui Nui","Hawai'i"))]
 
 
 		# plot index with log-normal error
