@@ -156,7 +156,6 @@ for(t in 1:n_trips) {
         
         unavailable_s = unavailable[unavailable$SP_CODE == species[i],]
         
-        #observed_caught_by_trip[y, w, s, m, a, t] = max(unavailable_s$NUM_FISH)
         #if(all(unavailable_s$sold)) {
         #  unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + max(unavailable_s$NUM_FISH)
         #} else if(any(unavailable_s$sold)) {
@@ -165,7 +164,6 @@ for(t in 1:n_trips) {
         # There is an instance of two rows for the same specie within a single trip (ID_CODE = 1701620190402001, SP_CODE = 8835360704). The below code counts both rows, each with 7 fish.
         for(j in 1:nrow(unavailable_s)) {
           r = unavailable_s[j,]
-          observed_caught_by_trip[y, w, s, m, a, t] = r$NUM_FISH
           
           if(r$sold) {
             unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + r$NUM_FISH
@@ -192,17 +190,25 @@ for(y in 1:n_years) {
       for(m in 1:n_modes) {
         for(a in 1:n_areas) {
           unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
-          unavailable_catch_rate_var = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2) / (num_trips[y, w, m, a] - 1)
+          unavailable_catch_rate_var = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
           
           observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, ])
           observed_catch_rate_var = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
-
+          #y_bar = mean(observed_caught_by_trip[y, w, s, m, a, ])#sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
+          #x_bar = mean(anglers_by_trip[y, w, m, a, ])
+          #var_y = var(observed_caught_by_trip[y, w, s, m, a, ])#var(observed_total_caught[y, w, s, m, a, ]) / (num_trips[y, w, m, a] ^ 2)
+          #var_x = var(anglers_by_trip[y, w, m, a, ])
+          #cov_xy = cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ])
+          
+          #observed_catch_rate_var = (y_bar / x_bar) ^ 2 * (var_y / (y_bar ^ 2) + var_x / (x_bar ^ 2) - 2 * cov_xy / (x_bar * y_bar))
+          
           catch_rate_var[y, w, s, m, a] = unavailable_catch_rate_var + observed_catch_rate_var
         }
       }
     }
   }
 }
+catch_rate_var[is.nan(catch_rate_var)] = 0
 
 # effort
 
@@ -246,14 +252,34 @@ for(s in 1:n_species) {
 total_catch_num_var_annual = apply(total_catch_num_var, c(1, 3, 4, 5), sum)
 total_catch_pse_annual = sqrt(total_catch_num_var_annual) / apply(total_catch_num, c(1, 3, 4, 5), sum) * 100
 
-total_catch_weight = total_catch_num * mean_weight_wave
+total_catch_weight = apply(total_catch_num, c(1, 3, 4, 5), sum) * mean_weight_year
 
-proportion_sold = (observed_total_caught[, , , , , 1] + unavailable_total_caught[, , , , , 1]) / (apply(observed_total_caught + unavailable_total_caught, c(1, 2, 3, 4, 5), sum))
-total_sale_num = total_catch_num * proportion_sold
-total_sale_weight = total_catch_weight * proportion_sold
+proportion_kept = (observed_total_caught[, , , , , 2] + unavailable_total_caught[, , , , , 2]) / (apply(observed_total_caught + unavailable_total_caught, c(1, 2, 3, 4, 5), sum))
+proportion_kept[is.nan(proportion_kept)] = 0
 
-# checking results
-# https://www.fisheries.noaa.gov/data-tools/recreational-fisheries-statistics-queries
+total_catch_num_kept = total_catch_num * proportion_kept
+total_catch_weight_kept = apply(total_catch_num_kept, c(1, 3, 4, 5), sum) * mean_weight_year
+
+#checking results
+
+# checking catch disposition against Appendix Table 1c from Ma submitted manuscript
+total_catch_proportion_kept = 1-apply(total_catch_num_kept, c(1, 3), sum, na.rm = T)/apply(total_catch_num, c(1, 3), sum, na.rm = T) # [year, species]
+
+official_total_catch_proportion_kept = array(c(NA, 0, 0, NA, 11, 0, 100, 0, 100, 16, 15, 40, 74, 0, NA, NA, NA, NA, NA,
+                                               NA, 71, 51, 89, 54, 38, 44, 53, 62, 59, 53, 69, 39, 66, NA, NA, NA, NA, NA,
+                                               NA, 61, 31, 68, 68, 45, 46, 79, 77, 37, 37, 62, 10, 64, NA, NA, NA, NA, NA,
+                                               NA, 69, 27, 23, 55, 56, 61, 78, 65, 57, 55, 83, 60, 69, NA, NA, NA, NA, NA,
+                                               NA, 0, 0, 0, 5, 0, 0, 82, 71, 37, 48, 45, 75, 56, NA, NA, NA, NA, NA,
+                                               NA, 100, 100, NA, 100, 0, 0, 0, 100, 0, 100, NA, 0, 40, NA, NA, NA, NA, NA,
+                                               NA, 0, 0, NA, 60, 47, 0, 0, 0, 78, 0, 100, 82, 0, NA, NA, NA, NA, NA) / 100, dim = c(n_years, n_species))
+
+for(s in 1:n_species) {
+  plot(x = years, y = official_total_catch_proportion_kept[, s], type = "l", xlab = "Year", ylab = paste0(species_df[s,]$hawaiian_name, " Catch Number % Kept"))
+  lines(x = years, y = total_catch_proportion_kept[, s], col = "red")
+  legend(x = "topright", col = c("black", "red"), lty = 1, legend = c("Ma et al.", "Me"), bty = "n")
+}
+
+# checking catch number against https://www.fisheries.noaa.gov/data-tools/recreational-fisheries-statistics-queries
 
 official_catch = read.csv("./MRIP_Ifiles_HI/HMRFS catch.csv")
 official_catch$Total.Harvest..A.B1. = as.numeric(gsub(",", "", official_catch$Total.Harvest..A.B1.))
@@ -282,6 +308,12 @@ for(s in 1:n_species) {
   lines(x = years, y = apply(total_catch_num[, , s, , ], c(1), sum), col = "red")
   legend(x = "topright", col = c("black", "red"), lty = 1, legend = c("HMRFS", "Me"), bty = "n")
 }
+
+# checking catch number variance against https://www.fisheries.noaa.gov/data-tools/recreational-fisheries-statistics-queries
+
+sqrt(apply(total_catch_num_var_annual, c(1, 2), sum, na.rm = T))/sqrt(official_catch_num_var)
+
+
 
 t2 = Sys.time()
 t2 - t1
