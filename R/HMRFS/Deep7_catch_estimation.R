@@ -1,6 +1,7 @@
 t1 = Sys.time()
 
 library(sas7bdat)
+library(KFAS)
 
 setwd("/Users/Toby/Documents/GitHub/MHI_Bottomfish_2023/R/HMRFS")
 i1 = read.sas7bdat("./MRIP_Ifiles_HI/i1.sas7bdat", debug = TRUE)
@@ -45,18 +46,7 @@ n_areas = 3
 n_trips = length(trips)
 n_dispositions = 2
 
-num_weighed = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-num_estimated = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
-total_weight = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-observed_caught_by_trip = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_trips))
-observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
-mean_weight_wave = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-mean_weight_year = array(0, dim = c(n_years, n_species, n_modes, n_areas))
 num_trips = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
-catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
-catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 
 for(y in 1:n_years) {
   for(w in 1:n_waves) {
@@ -67,6 +57,14 @@ for(y in 1:n_years) {
     }
   }
 }
+
+anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
+observed_caught_by_trip = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_trips))
+observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
+num_weighed = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+num_estimated = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+total_weight = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
 
 for(t in 1:n_trips) {
   trip = trips[t]
@@ -176,13 +174,23 @@ for(t in 1:n_trips) {
   }
 }
 
+mean_weight_wave = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+mean_weight_year = array(0, dim = c(n_years, n_species, n_modes, n_areas))
+mean_weight_all = array(0, dim = c(n_species))
+catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+
 for(s in 1:n_species) {
   mean_weight_wave[, , s, , ] = total_weight[, , s, , ] / (num_weighed[, , s, , ] + num_estimated[, , s, , ])
   mean_weight_year[, s, , ] = apply(total_weight[, , s, , ], c(1, 3, 4), sum) / apply(num_weighed[, , s, , ] + num_estimated[, , s, , ], c(1, 3, 4), sum)
+  mean_weight_all[s] = sum(total_weight[, , s, , ]) / (sum(num_weighed[, , s, , ] + num_estimated[, , s, , ]))
   catch_rate[, , s, , ] = apply(observed_total_caught[, , s, , , ] + unavailable_total_caught[, , s, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum)
 }
 catch_rate[18, 3, , , ] = catch_rate[17, 3, , , ] # No data available for April - June 2020, so use previous year
-catch_rate[is.na(catch_rate)] = 0
+catch_rate[is.nan(catch_rate)] = 0
+
+catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+unavailable_catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+observed_catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 
 for(y in 1:n_years) {
   for(w in 1:n_waves) {
@@ -190,10 +198,10 @@ for(y in 1:n_years) {
       for(m in 1:n_modes) {
         for(a in 1:n_areas) {
           unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
-          unavailable_catch_rate_var = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
+          unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
           
           observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, ])
-          observed_catch_rate_var = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
+          observed_catch_rate_var[y, w, s, m, a] = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
           #y_bar = mean(observed_caught_by_trip[y, w, s, m, a, ])#sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
           #x_bar = mean(anglers_by_trip[y, w, m, a, ])
           #var_y = var(observed_caught_by_trip[y, w, s, m, a, ])#var(observed_total_caught[y, w, s, m, a, ]) / (num_trips[y, w, m, a] ^ 2)
@@ -202,13 +210,12 @@ for(y in 1:n_years) {
           
           #observed_catch_rate_var = (y_bar / x_bar) ^ 2 * (var_y / (y_bar ^ 2) + var_x / (x_bar ^ 2) - 2 * cov_xy / (x_bar * y_bar))
           
-          catch_rate_var[y, w, s, m, a] = unavailable_catch_rate_var + observed_catch_rate_var
+          catch_rate_var[y, w, s, m, a] = unavailable_catch_rate_var[y, w, s, m, a] + observed_catch_rate_var[y, w, s, m, a]
         }
       }
     }
   }
 }
-catch_rate_var[is.nan(catch_rate_var)] = 0
 
 # effort
 
@@ -220,6 +227,7 @@ effort_df$area = ifelse(effort_df$Fishing.Area == "OCEAN (> 3 MI)", 1, ifelse(ef
 
 effort = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
 effort_var = array(0, dim = c(n_years, n_waves, n_modes, n_areas))
+
 for(y in 1:n_years) {
   for(w in 1:n_waves) {
     for(m in 1:n_modes) {
@@ -244,6 +252,7 @@ for(y in 1:n_years) {
 
 total_catch_num = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 total_catch_num_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+
 for(s in 1:n_species) {
   total_catch_num[, , s, , ] = catch_rate[, , s, , ] * effort
   total_catch_num_var[, , s, , ] = catch_rate_var[, , s, , ] * effort ^ 2 + effort_var * catch_rate[, , s, , ] ^ 2 - catch_rate_var[, , s, , ] * effort_var
@@ -252,13 +261,13 @@ for(s in 1:n_species) {
 total_catch_num_var_annual = apply(total_catch_num_var, c(1, 3, 4, 5), sum)
 total_catch_pse_annual = sqrt(total_catch_num_var_annual) / apply(total_catch_num, c(1, 3, 4, 5), sum) * 100
 
-total_catch_weight = apply(total_catch_num, c(1, 3, 4, 5), sum) * mean_weight_year
+total_catch_weight = sweep(apply(total_catch_num, c(1, 3, 4, 5), sum), 2, mean_weight_all, FUN = "*")
 
 proportion_kept = (observed_total_caught[, , , , , 2] + unavailable_total_caught[, , , , , 2]) / (apply(observed_total_caught + unavailable_total_caught, c(1, 2, 3, 4, 5), sum))
 proportion_kept[is.nan(proportion_kept)] = 0
 
 total_catch_num_kept = total_catch_num * proportion_kept
-total_catch_weight_kept = apply(total_catch_num_kept, c(1, 3, 4, 5), sum) * mean_weight_year
+total_catch_weight_kept = sweep(apply(total_catch_num_kept, c(1, 3, 4, 5), sum), 2, mean_weight_all, FUN = "*")
 
 #checking results
 
@@ -313,7 +322,61 @@ for(s in 1:n_species) {
 
 sqrt(apply(total_catch_num_var_annual, c(1, 2), sum, na.rm = T))/sqrt(official_catch_num_var)
 
+# CPUE smoothing
 
+# in the second-to-last dimension, index 1 = ocean (> 3 mi), index 2 = ocean (<= 3 mi), and index 3 = aggregated across fishing areas
+# in the last dimension, index 1 = MA-3, index 2 = Kalman, and index 3 = unsmoothed
+year_smoothed_catch_rate = array(0, dim = c(n_years, n_species, 3, 3))
+year_smoothed_total_catch = array(0, dim = c(n_years, n_species, 3, 3))
+
+total_caught = observed_total_caught + unavailable_total_caught
+
+for(y in 1:n_years) {
+  smooth_years = c(y - 1, y , y + 1)
+  smooth_years = smooth_years[smooth_years > 0 & smooth_years <= n_years]
+  
+  for(s in 1:n_species) {
+    year_smoothed_catch_rate[y, s, 3, 1] = mean(sapply(smooth_years, function(f) sum(total_caught[f, , s, 1, 1:2, ]) / sum(anglers_by_trip[f, , 1, 1:2, ])))
+    year_smoothed_catch_rate[y, s, 3, 3] = sum(total_caught[y, , s, 1, 1:2, ]) / sum(anglers_by_trip[y, , 1, 1:2, ])
+    year_smoothed_total_catch[y, s, 3, 1] = year_smoothed_catch_rate[y, s, 3, 1] * sum(effort[y, , 1, 1:2])
+    year_smoothed_total_catch[y, s, 3, 3 ] = year_smoothed_catch_rate[y, s, 3, 2] * sum(effort[y, , 1, 1:2])
+    
+    for(a in 1:(n_areas - 1)) {
+      year_smoothed_catch_rate[y, s, a, 1] = mean(sapply(smooth_years, function(f) sum(total_caught[f, , s, 1, a, ]) / sum(anglers_by_trip[f, , 1, a, ])))
+      year_smoothed_catch_rate[y, s, a, 3] = sum(total_caught[y, , s, 1, a, ]) / sum(anglers_by_trip[y, , 1, a, ])
+      year_smoothed_total_catch[y, s, a, 1] = year_smoothed_catch_rate[y, s, a, 1] * sum(effort[y, , 1, a])
+      year_smoothed_total_catch[y, s, a, 3] = year_smoothed_catch_rate[y, s, a, 2] * sum(effort[y, , 1, a])
+    }
+  }
+}
+
+for(s in 1:n_species) {
+  year_smoothed_catch_rate[, s, 3, 2] = KFS(SSModel(apply(total_caught[, , s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip[, , 1, 1:2, ], c(1), sum) ~ SSMtrend(1, Q = 0.01), H = 0.01))$alphahat
+  year_smoothed_total_catch[, s, 3, 2] = year_smoothed_catch_rate[, s, 3, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, 1:2]))
+  
+  for(a in 1:(n_areas - 1)) {
+    year_smoothed_catch_rate[, s, a, 2] = KFS(SSModel(apply(total_caught[, , s, 1, a, ], c(1), sum) / apply(anglers_by_trip[, , 1, a, ], c(1), sum) ~ SSMtrend(1, Q = 0.01), H = 0.01))$alphahat
+    year_smoothed_total_catch[, s, a, 2] = year_smoothed_catch_rate[, s, a, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, a]))
+  }
+}
+
+unaccounted_total_catch = apply(total_catch_num[, , , 2,], c(1, 3), sum, na.rm = T)
+ma_smoothed_catch_plot = year_smoothed_total_catch[, , 3, 1] + unaccounted_total_catch
+ma_smoothed_by_area_catch_plot = apply(year_smoothed_total_catch[, , 1:2, 1], c(1, 2), sum) + unaccounted_total_catch
+kalman_smoothed_catch_plot = year_smoothed_total_catch[, , 3, 2] + unaccounted_total_catch
+kalman_smoothed_by_area_catch_plot = apply(year_smoothed_total_catch[, , 1:2, 2], c(1, 2), sum) + unaccounted_total_catch
+
+s = 4
+y_max = max(c(ma_smoothed_catch_plot[, s], ma_smoothed_by_area_catch_plot[, s], kalman_smoothed_catch_plot[, s], kalman_smoothed_by_area_catch_plot[, s], official_catch_num[, s]))
+plot(years, ma_smoothed_catch_plot[, s], ylim = c(0, y_max), col = "red", type = "l", xlab = "Year", ylab = paste0(species_df[s,]$hawaiian_name, " Catch"))
+lines(years, ma_smoothed_by_area_catch_plot[, s], col = "red", lty = "dashed")
+lines(years, kalman_smoothed_catch_plot[, s], col = "green")
+lines(years, kalman_smoothed_by_area_catch_plot[, s], col = "green", lty = "dashed")
+lines(years, official_catch_num[, s], col = "black")
+legend(x = "topright", col = c("red", "red", "green", "green", "black"), lty = c("solid", "dashed", "solid", "dashed", "solid"), legend = c("MA-3", "MA-3 by area", "Kalman", "Kalman by area", "Original"), bty = "n")
+
+#wave_smoothed_catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_areas - 1, 2))
+#wave_smoothed_catch_rate_aggregated = array(0, dim = c(n_years, n_waves, n_species, 2))
 
 t2 = Sys.time()
 t2 - t1
