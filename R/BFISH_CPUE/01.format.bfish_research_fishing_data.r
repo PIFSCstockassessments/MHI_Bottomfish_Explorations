@@ -18,6 +18,11 @@
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 
 #_____________________________________________________________________________________________________________________________
+# define data_flag
+	# data_flag = "" # only loads data up through 2020
+	data_flag = "2021_" # includes data through 2021
+
+#_____________________________________________________________________________________________________________________________
 # define helper function for converting DRIFT_START_TIME & DRIFT_END_TIME to 0-24 decimal
 	convert_drift_time = function(x)
 	# last two digits give minutes
@@ -56,7 +61,7 @@
 #_____________________________________________________________________________________________________________________________
 # bring in research fishing data
 	# drift-specific information
-	BFISH_D = fread(paste0(proj.dir,"Data/CRF_DRIFT.csv")) %>%
+	BFISH_D = fread(paste0(proj.dir,"Data/",data_flag,"CRF_DRIFT.csv")) %>%
 			  .[,.(BFISH,SAMPLE_ID,DRIFT_START_TIME,START_DEPTH_M,START_LON,START_LAT,DRIFT_END_TIME,END_DEPTH_M,END_LON,END_LAT)] %>%
 			  .[,DRIFT_START_TIME:=sapply(DRIFT_START_TIME,convert_drift_time)] %>%
 			  .[,DRIFT_END_TIME:=sapply(DRIFT_END_TIME,convert_drift_time)] %>%
@@ -64,7 +69,7 @@
 			  .[,.(TIME_MIN,TIME_MAX,TIME_MEAN=mean(c(TIME_MIN,TIME_MAX),na.rm=TRUE),DEPTH_M = mean(c(START_DEPTH_M,END_DEPTH_M),na.rm=TRUE),LON=mean(c(START_LON,END_LON),na.rm=TRUE),LAT=mean(c(START_LAT,END_LAT),na.rm=TRUE)),by=.(BFISH,SAMPLE_ID)]
 
 	# sample-specific (i.e., PSU) information
-	BFISH_S = fread(paste0(proj.dir,"Data/CRF_SAMPLE.csv")) %>%
+	BFISH_S = fread(paste0(proj.dir,"Data/",data_flag,"CRF_SAMPLE.csv")) %>%
 			  .[,.(BFISH,SAMPLE_ID,PSU,SAMPLE_DATE,VESSEL,CAPTAIN_CD,OBSERVER,WIND_SPEED_KT,WAVE_HEIGHT_FT,CURRENT_CD)] %>%
 			  .[,SAMPLE_DATE:=as.POSIXct(SAMPLE_DATE,tz="HST",format=c("%Y-%m-%d"))] %>%
 			  .[,YEAR:=format(SAMPLE_DATE,format="%Y")] %>%
@@ -81,11 +86,12 @@
 
 
 	# catches (one row per length measurement)
-	BFISH_C = fread(paste0(proj.dir,"Data/CRF_CATCH.csv")) %>%
+	BFISH_C = fread(paste0(proj.dir,"Data/",data_flag,"CRF_CATCH.csv")) %>%
 			  .[,.N,by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,LENGTH_CM)] %>%
 			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
 			  merge(.,species_dt[,.(SPECIES_CD,A,B,GCF)]) %>%
 			  .[,STD_N:=N/GCF] %>% 
+			  .[,LENGTH_CM:=round(as.numeric(LENGTH_CM))] %>%
 			  .[,Biomass:=A * (LENGTH_CM^B)] %>%
 			  .[,KG:=Biomass*N] %>%
 			  .[,STD_KG:=Biomass*STD_N] %>%
@@ -175,7 +181,7 @@
 						
 	
 	# save formatted data
-		save(BFISH_D,file=paste0(proj.dir,"Data/BFISH_D.RData"))
-		save(BFISH_S,file=paste0(proj.dir,"Data/BFISH_S.RData"))
-		save(BFISH_C,file=paste0(proj.dir,"Data/BFISH_C.RData"))
-		save(research_fishing_dt,file=paste0(proj.dir,"Data/research_fishing_dt.RData"))
+		save(BFISH_D,file=paste0(proj.dir,"Data/",data_flag,"BFISH_D.RData"))
+		save(BFISH_S,file=paste0(proj.dir,"Data/",data_flag,"BFISH_S.RData"))
+		save(BFISH_C,file=paste0(proj.dir,"Data/",data_flag,"BFISH_C.RData"))
+		save(research_fishing_dt,file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.RData"))

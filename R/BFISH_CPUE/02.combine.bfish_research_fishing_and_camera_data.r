@@ -14,11 +14,14 @@
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
-
+#_____________________________________________________________________________________________________________________________
+# define data_flag
+	# data_flag = "" # only loads data up through 2020
+	data_flag = "2021_" # includes data through 2021
 #_____________________________________________________________________________________________________________________________
 # bring in data
-	load(file=paste0(proj.dir,"Data/camera_dt.RData"))
-	load(file=paste0(proj.dir,"Data/research_fishing_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"camera_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.RData"))
 
 #_____________________________________________________________________________________________________________________________
 # define common columns
@@ -96,8 +99,8 @@
 							 setnames(.,c("variable","value"),c("species_cd","weight_kg"))
 #_____________________________________________________________________________________________________________________________
 # save formatted data
-	save(common_camera_dt,file=paste0(proj.dir,"Data/common_camera_dt.RData"))
-	save(common_research_fishing_dt,file=paste0(proj.dir,"Data/common_research_fishing_dt.RData"))
-	save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/bfish_combined_wide_dt.RData"))
-	save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/bfish_combined_long_dt.RData"))
+	save(common_camera_dt,file=paste0(proj.dir,"Data/",data_flag,"common_camera_dt.RData"))
+	save(common_research_fishing_dt,file=paste0(proj.dir,"Data/",data_flag,"common_research_fishing_dt.RData"))
+	save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_wide_dt.RData"))
+	save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_long_dt.RData"))
 

@@ -23,6 +23,10 @@
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 
 #_____________________________________________________________________________________________________________________________
+# define data_flag
+	# data_flag = "" # only loads data up through 2020
+	data_flag = "2021_" # includes data through 2021
+#_____________________________________________________________________________________________________________________________
 # define helper function for converting DROP_TIME in 0-24 hours
 	convert_drop_time = function(x)
 	{	
@@ -101,12 +105,12 @@
 
 	# catches (one row per length measurement)
 	# remove these drops/PSUs
-	dark_drops = fread(paste0(proj.dir,"Data/CAM_MAXN.csv"))[SPECIES_CD == "DARK"]$DROP_CD
-	BFISH_CAM_COUNT = fread(paste0(proj.dir,"Data/CAM_MAXN.csv")) %>%
+	dark_drops = fread(paste0(proj.dir,"Data/",data_flag,"CAM_MAXN.csv"))[SPECIES_CD == "DARK"]$DROP_CD
+	BFISH_CAM_COUNT = fread(paste0(proj.dir,"Data/",data_flag,"CAM_MAXN.csv")) %>%
 			  .[,.(MAXN=sum(MAXN)),by=.(DROP_CD,SPECIES_CD)] %>%
 			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
 			  .[!(DROP_CD %in% dark_drops)]
-	BFISH_CAM_LENGTHS = fread(paste0(proj.dir,"Data/CAM_LENGTHS.csv")) %>%
+	BFISH_CAM_LENGTHS = fread(paste0(proj.dir,"Data/",data_flag,"CAM_LENGTHS.csv")) %>%
 			      .[,LENGTH_CM:=round(MEAN_MM/10)] %>%
 				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
 				  .[,.N,by=.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
@@ -144,7 +148,7 @@
 			
 
 	# drop-specific information
-	BFISH_CAM_S = fread(paste0(proj.dir,"Data/CAM_SAMPLE_TIME.csv")) %>%
+	BFISH_CAM_S = fread(paste0(proj.dir,"Data/",data_flag,"CAM_SAMPLE_TIME.csv")) %>%
 			  .[,.(DROP_CD,DROP_DATE,DROP_TIME,VESSEL,GEAR_ID,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)] %>%
 			  .[,DROP_TIME_HST:=sapply(DROP_TIME,convert_drop_time)] %>%
 			  .[,SAMPLE_DATE:=as.POSIXct(as.character(DROP_DATE),format=c("%Y%m%d"))] %>%
@@ -178,6 +182,6 @@
 						  na.omit(.)
 
 	# save formatted data
-		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/BFISH_CAM_S.RData"))
-		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/BFISH_CAM_C.RData"))
-		save(camera_dt,file=paste0(proj.dir,"Data/camera_dt.RData"))
+		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"BFISH_CAM_S.RData"))
+		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/",data_flag,"BFISH_CAM_C.RData"))
+		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"camera_dt.RData"))
