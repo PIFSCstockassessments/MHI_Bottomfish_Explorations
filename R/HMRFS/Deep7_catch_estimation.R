@@ -1,6 +1,7 @@
 t1 = Sys.time()
 
 library(sas7bdat)
+library(zoo)
 library(KFAS)
 
 setwd("/Users/Toby/Documents/GitHub/MHI_Bottomfish_2023/R/HMRFS")
@@ -292,9 +293,12 @@ for(s in 1:n_species) {
 
 official_catch = read.csv("./MRIP_Ifiles_HI/HMRFS catch.csv")
 official_catch$Total.Harvest..A.B1. = as.numeric(gsub(",", "", official_catch$Total.Harvest..A.B1.))
+official_catch$wave = match(official_catch$Wave, c("JANUARY/FEBRUARY", "MARCH/APRIL", "MAY/JUNE", "JULY/AUGUST", "SEPTEMBER/OCTOBER", "NOVEMBER/DECEMBER"))
 
-official_catch_num = array(0, dim = c(length(years), nrow(species_df)))
-official_catch_num_var = array(0, dim = c(length(years), nrow(species_df)))
+official_catch_num = array(0, dim = c(n_years, n_species))
+official_catch_num_wave = array(0, dim = c(n_years, n_waves, n_species))
+official_catch_num_var = array(0, dim = c(n_years, n_species))
+official_catch_num_var_wave = array(0, dim = c(n_years, n_waves, n_species))
 
 for(y in 1:n_years) {
   for(s in 1:n_species) {
@@ -307,6 +311,18 @@ for(y in 1:n_years) {
         r = rows[i,]
         
         official_catch_num_var[y, s] = official_catch_num_var[y, s] + (r$Total.Harvest..A.B1.  * r$PSE / 100) ^ 2
+      }
+      
+      for(w in 1:n_waves) {
+        rows = rows[rows$wave == w,]
+        
+        if(nrow(rows) > 0) {
+          official_catch_num_wave[y, w, s] = sum(rows$Total.Harvest..A.B1.)
+          
+          for(i in 1:nrow(rows)) {
+            official_catch_num_var_wave[y, w, s] = official_catch_num_var_wave[y, w, s] + (r$Total.Harvest..A.B1.  * r$PSE / 100) ^ 2
+          }
+        }
       }
     }
   }
@@ -322,41 +338,108 @@ for(s in 1:n_species) {
 
 sqrt(apply(total_catch_num_var_annual, c(1, 2), sum, na.rm = T))/sqrt(official_catch_num_var)
 
-# CPUE smoothing
+# Annual CPUE smoothing
 
 # in the second-to-last dimension, index 1 = ocean (> 3 mi), index 2 = ocean (<= 3 mi), and index 3 = aggregated across fishing areas
-# in the last dimension, index 1 = MA-3, index 2 = Kalman, and index 3 = unsmoothed
-year_smoothed_catch_rate = array(0, dim = c(n_years, n_species, 3, 3))
-year_smoothed_total_catch = array(0, dim = c(n_years, n_species, 3, 3))
+# in the last dimension, index 1 = MA-3, index 2 = Kalman
+year_smoothed_catch_rate = array(0, dim = c(n_years, n_species, 3, 2))
+year_smoothed_total_catch = array(0, dim = c(n_years, n_species, 3, 2))
+
+n_smooth_years = 1 # number of years on either side to smooth across
+q = 0.01 # random walk parameter for Kalman filter
+h = 0.01 # observation process parameter for Kalman filter
 
 total_caught = observed_total_caught + unavailable_total_caught
 
-for(y in 1:n_years) {
-  smooth_years = c(y - 1, y , y + 1)
-  smooth_years = smooth_years[smooth_years > 0 & smooth_years <= n_years]
+for(s in 1:n_species) {
+  year_smoothed_catch_rate[, s, 3, 1] = rollapplyr(apply(total_caught[, , s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip[, , 1, 1:2, ], c(1), sum), 1 + 2 * n_smooth_years, FUN = mean, partial = T, align = "center")
+  year_smoothed_total_catch[, s, 3, 1] = year_smoothed_catch_rate[, s, 3, 1] * apply(effort[, , 1, 1:2], c(1), sum)
   
-  for(s in 1:n_species) {
-    year_smoothed_catch_rate[y, s, 3, 1] = mean(sapply(smooth_years, function(f) sum(total_caught[f, , s, 1, 1:2, ]) / sum(anglers_by_trip[f, , 1, 1:2, ])))
-    year_smoothed_catch_rate[y, s, 3, 3] = sum(total_caught[y, , s, 1, 1:2, ]) / sum(anglers_by_trip[y, , 1, 1:2, ])
-    year_smoothed_total_catch[y, s, 3, 1] = year_smoothed_catch_rate[y, s, 3, 1] * sum(effort[y, , 1, 1:2])
-    year_smoothed_total_catch[y, s, 3, 3 ] = year_smoothed_catch_rate[y, s, 3, 2] * sum(effort[y, , 1, 1:2])
+  for(a in 1:(n_areas - 1)) {
+    year_smoothed_catch_rate[, s, a, 1] = rollapplyr(apply(total_caught[, , s, 1, a, ], c(1), sum) / apply(anglers_by_trip[, , 1, a, ], c(1), sum), 1 + 2 * n_smooth_years, FUN = mean, partial = T, align = "center")
+    year_smoothed_total_catch[, s, a, 1] = year_smoothed_catch_rate[, s, a, 1] * apply(effort[, , 1, a], c(1), sum)
+  }
+  
+  cpues = apply(total_caught[, , s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip[, , 1, 1:2, ], c(1), sum)
+  year_smoothed_catch_rate[, s, 3, 2] = KFS(SSModel(cpues ~ SSMtrend(1, Q = q), H = h))$alphahat
+  year_smoothed_total_catch[, s, 3, 2] = year_smoothed_catch_rate[, s, 3, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, 1:2]))
+  
+  for(a in 1:(n_areas - 1)) {
+    cpues = apply(total_caught[, , s, 1, a, ], c(1), sum) / apply(anglers_by_trip[, , 1, a, ], c(1), sum)
+    year_smoothed_catch_rate[, s, a, 2] = KFS(SSModel(cpues ~ SSMtrend(1, Q = q), H = h))$alphahat
+    year_smoothed_total_catch[, s, a, 2] = year_smoothed_catch_rate[, s, a, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, a]))
+  }
+}
+
+unaccounted_total_catch = apply(total_catch_num[, , , 2,], c(1, 3), sum, na.rm = T)
+ma_smoothed_catch_plot = year_smoothed_total_catch[, , 3, 1] + unaccounted_total_catch
+ma_smoothed_by_area_catch_plot = apply(year_smoothed_total_catch[, , 1:2, 1], c(1, 2), sum) + unaccounted_total_catch
+kalman_smoothed_catch_plot = year_smoothed_total_catch[, , 3, 2] + unaccounted_total_catch
+kalman_smoothed_by_area_catch_plot = apply(year_smoothed_total_catch[, , 1:2, 2], c(1, 2), sum) + unaccounted_total_catch
+
+s = 6
+y_max = max(c(ma_smoothed_catch_plot[, s], ma_smoothed_by_area_catch_plot[, s], kalman_smoothed_catch_plot[, s], kalman_smoothed_by_area_catch_plot[, s], official_catch_num[, s]))
+plot(years, ma_smoothed_catch_plot[, s], ylim = c(0, y_max), col = "red", type = "l", xlab = "Year", ylab = paste0(species_df[s,]$hawaiian_name, " Catch"))
+lines(years, ma_smoothed_by_area_catch_plot[, s], col = "red", lty = "dashed")
+lines(years, kalman_smoothed_catch_plot[, s], col = "green")
+lines(years, kalman_smoothed_by_area_catch_plot[, s], col = "green", lty = "dashed")
+lines(years, official_catch_num[, s], col = "black")
+legend(x = "topright", col = c("red", "red", "green", "green", "black"), lty = c("solid", "dashed", "solid", "dashed", "solid"), legend = c("MA-3", "MA-3 by area", "Kalman", "Kalman by area", "Original"), bty = "n")
+
+# Wave-level CPUE smoothing
+
+n_year_waves = n_years * n_waves
+
+wave_smoothed_catch_rate = array(0, dim = c(n_year_waves, n_species, 3, 2))
+wave_smoothed_total_catch = array(0, dim = c(n_year_waves, n_species, 3, 2))
+
+n_smooth_waves = 6 # number of waves on either side to smooth across
+q = 0.01 # random walk parameter for Kalman filter
+h = 0.01 # observation process parameter for Kalman filter
+
+total_caught = observed_total_caught + unavailable_total_caught
+
+total_caught_yw = array(0, dim = c(n_year_waves, n_species, n_modes, n_areas, n_dispositions))
+anglers_by_trip_yw = array(0, dim = c(n_year_waves, n_modes, n_areas, n_trips))
+effort_yw = array(0, dim = c(n_year_waves, n_modes, n_areas))
+
+for(y in 1:n_years) {
+  for(w in 1:n_waves) {
+    index = (y - 1) * 6 + w
     
-    for(a in 1:(n_areas - 1)) {
-      year_smoothed_catch_rate[y, s, a, 1] = mean(sapply(smooth_years, function(f) sum(total_caught[f, , s, 1, a, ]) / sum(anglers_by_trip[f, , 1, a, ])))
-      year_smoothed_catch_rate[y, s, a, 3] = sum(total_caught[y, , s, 1, a, ]) / sum(anglers_by_trip[y, , 1, a, ])
-      year_smoothed_total_catch[y, s, a, 1] = year_smoothed_catch_rate[y, s, a, 1] * sum(effort[y, , 1, a])
-      year_smoothed_total_catch[y, s, a, 3] = year_smoothed_catch_rate[y, s, a, 2] * sum(effort[y, , 1, a])
-    }
+    total_caught_yw[index, , , , ] = total_caught[y, w, , , , ]
+    anglers_by_trip_yw[index, , , ] = anglers_by_trip[y, w, , , ]
+    effort_yw[index, , ] = effort[y, w, , ]
   }
 }
 
 for(s in 1:n_species) {
-  year_smoothed_catch_rate[, s, 3, 2] = KFS(SSModel(apply(total_caught[, , s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip[, , 1, 1:2, ], c(1), sum) ~ SSMtrend(1, Q = 0.01), H = 0.01))$alphahat
-  year_smoothed_total_catch[, s, 3, 2] = year_smoothed_catch_rate[, s, 3, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, 1:2]))
+  wave_smoothed_catch_rate[, s, 3, 1] = rollapplyr(apply(total_caught_yw[, s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, 1:2, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center")
+  wave_smoothed_total_catch[, s, 3, 1] = wave_smoothed_catch_rate[, s, 3, 1] * apply(effort_yw[, 1, 1:2], c(1), sum)
   
   for(a in 1:(n_areas - 1)) {
-    year_smoothed_catch_rate[, s, a, 2] = KFS(SSModel(apply(total_caught[, , s, 1, a, ], c(1), sum) / apply(anglers_by_trip[, , 1, a, ], c(1), sum) ~ SSMtrend(1, Q = 0.01), H = 0.01))$alphahat
-    year_smoothed_total_catch[, s, a, 2] = year_smoothed_catch_rate[, s, a, 2] * sapply(1:n_years, function(f) sum(effort[f, , 1, a]))
+    wave_smoothed_catch_rate[, s, a, 1] = rollapplyr(apply(total_caught_yw[, s, 1, a, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, a, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center")
+    wave_smoothed_total_catch[, s, a, 1] = wave_smoothed_catch_rate[, s, a, 1] * effort_yw[, 1, a]
+  }
+  
+  cpues = apply(total_caught_yw[, s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, 1:2, ], c(1), sum)
+  wave_smoothed_catch_rate[, s, 3, 2] = KFS(SSModel(cpues ~ SSMtrend(1, Q = q), H = h))$alphahat
+  wave_smoothed_total_catch[, s, 3, 2] = wave_smoothed_catch_rate[, s, 3, 2] * sapply(1:n_year_waves, function(f) sum(effort_yw[f, 1, 1:2]))
+  
+  for(a in 1:(n_areas - 1)) {
+    cpues = apply(total_caught_yw[, s, 1, a, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, a, ], c(1), sum)
+    wave_smoothed_catch_rate[, s, a, 2] = KFS(SSModel(cpues ~ SSMtrend(1, Q = q), H = h))$alphahat
+    wave_smoothed_total_catch[, s, a, 2] = wave_smoothed_catch_rate[, s, a, 2] * sapply(1:n_year_waves, function(f) sum(effort_yw[f, 1, a]))
+  }
+}
+
+year_smoothed_total_catch = array(0, dim = c(n_years, n_species, 3, 2))
+
+for(s in 1:n_species) {
+  for(area in 1:3) {
+    for(smoother in 1:2) {
+      year_smoothed_total_catch[, s, area, smoother] = sapply(1:n_years, function(f) sum(wave_smoothed_total_catch[((f - 1) * 6 + 1):((f - 1) * 6 + 6), s, area, smoother], na.rm = T))
+    }
   }
 }
 
@@ -374,9 +457,6 @@ lines(years, kalman_smoothed_catch_plot[, s], col = "green")
 lines(years, kalman_smoothed_by_area_catch_plot[, s], col = "green", lty = "dashed")
 lines(years, official_catch_num[, s], col = "black")
 legend(x = "topright", col = c("red", "red", "green", "green", "black"), lty = c("solid", "dashed", "solid", "dashed", "solid"), legend = c("MA-3", "MA-3 by area", "Kalman", "Kalman by area", "Original"), bty = "n")
-
-#wave_smoothed_catch_rate = array(0, dim = c(n_years, n_waves, n_species, n_areas - 1, 2))
-#wave_smoothed_catch_rate_aggregated = array(0, dim = c(n_years, n_waves, n_species, 2))
 
 t2 = Sys.time()
 t2 - t1

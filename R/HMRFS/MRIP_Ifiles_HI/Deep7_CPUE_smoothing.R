@@ -15,7 +15,7 @@ ui = fluidPage(
                                                        "Gindai" = 7), selected = 3),
       numericInput("ma", "Moving Average # of Years +/-", value = 1, step = 1),
       numericInput("q", "Kalman Q", value = 0.01), # Random walk
-      numericInput("h", "Kalman H", value = 0.01), # Trend
+      numericInput("h", "Kalman H", value = 0.01), # Observation process
       checkboxGroupInput("lines", "Series to Plot", choices = list("Moving Average" = 1,
                                                                    "Moving Average by Area" = 2,
                                                                    "Kalman" = 3,
@@ -144,7 +144,7 @@ server = function(input, output) {
     }
     
     if(length(input$lines) > 0) {
-      legend(x = "topright", col = c(cols[2], cols[2], cols[3], cols[3], cols[1])[selected], lty = c("solid", "dashed", "solid", "dashed", "solid")[selected], legend = c("MA-3", "MA-3 by area", "Kalman", "Kalman by area", "Original")[selected], bty = "n")
+      legend(x = "topright", col = c(cols[2], cols[2], cols[3], cols[3], cols[1])[selected], lty = c("solid", "dashed", "solid", "dashed", "solid")[selected], legend = c("Moving Average", "Moving Average by area", "Kalman", "Kalman by area", "Original")[selected], bty = "n")
     }
   })
 }
