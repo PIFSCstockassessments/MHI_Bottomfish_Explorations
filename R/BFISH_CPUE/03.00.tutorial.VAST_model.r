@@ -31,8 +31,12 @@
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 
 #_____________________________________________________________________________________________________________________________
+# define data_flag
+	# data_flag = "" # only loads data up through 2020
+	data_flag = "2021_" # includes data through 2021
+#_____________________________________________________________________________________________________________________________
 # 1) bring in data
-	load(file=paste0(proj.dir,"Data/bfish_combined_long_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_long_dt.RData"))
 	# subset to single species
 	bfish_df = bfish_combined_long_dt %>% .[species_cd == "prfi"] %>% as.data.frame(.)
 	# needed to define spatial domain and for predicting on to create index
