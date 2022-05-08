@@ -414,11 +414,11 @@ for(y in 1:n_years) {
 }
 
 for(s in 1:n_species) {
-  wave_smoothed_catch_rate[, s, 3, 1] = rollapplyr(apply(total_caught_yw[, s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, 1:2, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center")
+  wave_smoothed_catch_rate[, s, 3, 1] = rollapplyr(apply(total_caught_yw[, s, 1, 1:2, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, 1:2, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center", na.rm = T)
   wave_smoothed_total_catch[, s, 3, 1] = wave_smoothed_catch_rate[, s, 3, 1] * apply(effort_yw[, 1, 1:2], c(1), sum)
   
   for(a in 1:(n_areas - 1)) {
-    wave_smoothed_catch_rate[, s, a, 1] = rollapplyr(apply(total_caught_yw[, s, 1, a, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, a, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center")
+    wave_smoothed_catch_rate[, s, a, 1] = rollapplyr(apply(total_caught_yw[, s, 1, a, ], c(1), sum) / apply(anglers_by_trip_yw[, 1, a, ], c(1), sum), 1 + 2 * n_smooth_waves, FUN = mean, partial = T, align = "center", na.rm = T)
     wave_smoothed_total_catch[, s, a, 1] = wave_smoothed_catch_rate[, s, a, 1] * effort_yw[, 1, a]
   }
   
