@@ -32,9 +32,9 @@ ui = fluidPage(
       numericInput("h_y", "Kalman H", value = 0.01), # Observation process for annual smoothing
       hr(),
       h4("Wave Smoothing Inputs"),
-      numericInput("ma_w", "Moving Average # of Waves +/-", value = 6, step = 1),
-      numericInput("q_w", "Kalman Q", value = 0.01), # Random walk for wave smoothing
-      numericInput("h_w", "Kalman H", value = 0.01), # Observation process for wave smoothing
+      numericInput("ma_w", "Moving Average # of Waves +/-", value = 18, step = 1),
+      numericInput("q_w", "Kalman Q", value = 0.002), # Random walk for wave smoothing
+      numericInput("h_w", "Kalman H", value = 0.05), # Observation process for wave smoothing
 
     ),
     mainPanel(
