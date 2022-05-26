@@ -65,6 +65,7 @@ observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n
 num_weighed = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 num_estimated = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
 total_weight = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas))
+unavailable_caught_by_trip = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_trips))
 unavailable_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
 
 for(t in 1:n_trips) {
@@ -158,6 +159,8 @@ for(t in 1:n_trips) {
         
         unavailable_s = unavailable[unavailable$SP_CODE == species[i],]
         
+        unavailable_caught_by_trip[y, w, s, m, a, t] = max(unavailable_s$NUM_FISH)
+        
         # The code below assumes only one row for each specie within each trip, and only takes the maximum number of fish caught from among the rows in the one such instance.
         #if(all(unavailable_s$sold)) {
         #  unavailable_total_caught[y, w, s, m, a, 1] = unavailable_total_caught[y, w, s, m, a, 1] + max(unavailable_s$NUM_FISH)
@@ -204,7 +207,7 @@ for(y in 1:n_years) {
       for(m in 1:n_modes) {
         for(a in 1:n_areas) {
           unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
-          unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_total_caught[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
+          unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_caught_by_trip[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
           
           observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, ])
           observed_catch_rate_var[y, w, s, m, a] = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
