@@ -59,6 +59,14 @@ for(y in 1:n_years) {
   }
 }
 
+domain_trips = array(F, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
+
+for(t in 1:n_trips) {
+  entry = i1[i1$ID_CODE == trips[t],][1,]
+  
+  domain_trips[match(entry$YEAR, years), entry$WAVE, entry$mode, entry$area, t] = T
+}
+
 anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
 observed_caught_by_trip = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_trips))
 observed_total_caught = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas, n_dispositions))
@@ -209,8 +217,8 @@ for(y in 1:n_years) {
           unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
           unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_caught_by_trip[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
           
-          observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, ])
-          observed_catch_rate_var[y, w, s, m, a] = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, ]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, ]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, ]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, ], anglers_by_trip[y, w, m, a, ]))
+          observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]])
+          observed_catch_rate_var[y, w, s, m, a] = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, domain_trips[y, w, m, a, ]]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, domain_trips[y, w, m, a, ]], anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]))
           
           #y_bar = mean(observed_caught_by_trip[y, w, s, m, a, ])#sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
           #x_bar = mean(anglers_by_trip[y, w, m, a, ])
@@ -320,12 +328,14 @@ for(y in 1:n_years) {
       }
       
       for(w in 1:n_waves) {
-        rows = rows[rows$wave == w,]
+        rows_w = rows[rows$wave == w,]
         
-        if(nrow(rows) > 0) {
-          official_catch_num_wave[y, w, s] = sum(rows$Total.Harvest..A.B1.)
+        if(nrow(rows_w) > 0) {
+          official_catch_num_wave[y, w, s] = sum(rows_w$Total.Harvest..A.B1.)
           
-          for(i in 1:nrow(rows)) {
+          for(i in 1:nrow(rows_w)) {
+            r = rows[i,]
+            
             official_catch_num_var_wave[y, w, s] = official_catch_num_var_wave[y, w, s] + (r$Total.Harvest..A.B1.  * r$PSE / 100) ^ 2 # convert percent standard error to variance
           }
         }
