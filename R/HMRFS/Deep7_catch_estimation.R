@@ -14,12 +14,12 @@ species_df = data.frame("key" = c(8835020413, 8835360304, 8835360302, 8835360704
                         "beta" = c(3.065*10^-5, 6.005*10^-5, 1.551*10^-5, 2.311*10^-5, 2.243*10^-5, 1.298*10^-4, 3.526*10^-5)) # for conversion from length (cm) to weight
 
 # for mode: index 1 = private boat, 2 = shore
-i1$mode = ifelse(i1$MODE_F == 8, 1, ifelse(i1$MODE_FX %in% 1:5, 2, NA))
+i1$mode = ifelse(i1$MODE_F == 8, 1, ifelse(i1$MODE_F %in% 1:5, 2, NA))
 # for area: index 1 = ocean (> 3 mi), 2 = ocean (<= 3 mi), 3 = inland
 i1$area_exp = ifelse(i1$AREA_X == 2, 1, ifelse(i1$AREA_X == 1, 2, ifelse(i1$AREA_X == 5, 3, NA)))
 
 observed_catch = observed_catch[observed_catch$DISP3 %in% c(3, 4, 5) & observed_catch$MODE_F != 7,] # fish that were not released and not from a charter trip
-unavailable_catch = unavailable_catch[unavailable_catch$DISPO %in% c(3, 4, 5) & unavailable_catch$MODE_F != 7,] # fish that were not released and not from a charter trip
+unavailable_catch = unavailable_catch[unavailable_catch$DISPO %in% c(3, 4, 5) & unavailable_catch$MODE_F != 7,] # fish that were not released and not from a charter trip; may include all DISP3 and DISP0 except for c(1, 2) - H. Ma
 
 # for disposition: index 1 = sold, 2 = not sold
 observed_catch$sold = ifelse(observed_catch$DISP3 == 5, T, F)
@@ -64,7 +64,7 @@ domain_trips = array(F, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
 for(t in 1:n_trips) {
   entry = i1[i1$ID_CODE == trips[t],][1,]
   
-  domain_trips[match(entry$YEAR, years), entry$WAVE, entry$mode, entry$area, t] = T
+  domain_trips[match(entry$YEAR, years), entry$WAVE, entry$mode, entry$area_exp, t] = T
 }
 
 anglers_by_trip = array(0, dim = c(n_years, n_waves, n_modes, n_areas, n_trips))
@@ -200,9 +200,9 @@ for(s in 1:n_species) {
   mean_weight_wave[, , s, , ] = total_weight[, , s, , ] / (num_weighed[, , s, , ] + num_estimated[, , s, , ])
   mean_weight_year[, s, , ] = apply(total_weight[, , s, , ], c(1, 3, 4), sum) / apply(num_weighed[, , s, , ] + num_estimated[, , s, , ], c(1, 3, 4), sum)
   mean_weight_all[s] = sum(total_weight[, , s, , ]) / (sum(num_weighed[, , s, , ] + num_estimated[, , s, , ]))
-  catch_rate[, , s, , ] = apply(observed_total_caught[, , s, , , ] + unavailable_total_caught[, , s, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum)
+  catch_rate[, , s, , ] = apply(observed_total_caught[, , s, , , ], c(1, 2, 3, 4), sum) / apply(anglers_by_trip, c(1, 2, 3, 4), sum) + apply(unavailable_total_caught[, , s, , , ], c(1,2,3,4), sum) / apply(num_trips, c(1,2,3,4), sum)
 }
-catch_rate[18, 3, , , ] = catch_rate[17, 3, , , ] # No data available for April - June 2020 because of Covid, so use catch rate from same wave 3 (May + June) in 2019 for wave 3 in 2020
+#catch_rate[18, 3, , , ] = catch_rate[17, 3, , , ] # No data available for April - June 2020 because of Covid, so use catch rate from same wave 3 (May + June) in 2019 for wave 3 in 2020
 catch_rate[is.nan(catch_rate)] = 0
 
 catch_rate_var = array(0, dim = c(n_years, n_waves, n_species, n_modes, n_areas)) # variance of CPUE (catch number per angler trip), calculated as the sum of the variance from observed and unavailable catch
@@ -215,7 +215,7 @@ for(y in 1:n_years) {
       for(m in 1:n_modes) {
         for(a in 1:n_areas) {
           unavailable_catch_rate = sum(unavailable_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]
-          unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_caught_by_trip[y, w, s, m, a, ] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
+          unavailable_catch_rate_var[y, w, s, m, a] = 1 / num_trips[y, w, m, a] * sum((unavailable_caught_by_trip[y, w, s, m, a, domain_trips[y, w, m, a, ]] - unavailable_catch_rate) ^ 2 / (num_trips[y, w, m, a] - 1))
           
           observed_catch_rate = (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) / mean(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]])
           observed_catch_rate_var[y, w, s, m, a] = 1 / (num_trips[y, w, m, a] * mean(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]) ^ 2) * (var(observed_caught_by_trip[y, w, s, m, a, domain_trips[y, w, m, a, ]]) + (sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a]) ^ 2 * var(anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]) - 2 * sum(observed_total_caught[y, w, s, m, a, ]) / num_trips[y, w, m, a] * cov(observed_caught_by_trip[y, w, s, m, a, domain_trips[y, w, m, a, ]], anglers_by_trip[y, w, m, a, domain_trips[y, w, m, a, ]]))
