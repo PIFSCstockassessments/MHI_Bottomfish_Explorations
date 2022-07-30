@@ -5,7 +5,7 @@
 # Set up simple spatiotemporal model example using VAST
 # 1) Bring data (including spatial data)
 # 2) Set-up barrier mesh (including conversion to equal distant projection)
-# 3) Fit single species (e.g. prfi - Opakapaka) model using Tweedie distribution
+# 3) Fit single species (e.g. prfi - Opakapaka) model using delta-Gamma distribution
 # 4) Examine diagnostics
 # 5) Calculate index
 
@@ -29,7 +29,7 @@
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
-	working_dir = paste0(proj.dir,"VAST/model_runs/tutorial/tweedie/")
+	working_dir = paste0(proj.dir,"VAST/model_runs/tutorial/dgamma/")
 	dir.create(working_dir,recursive=TRUE)
 
 #_____________________________________________________________________________________________________________________________
@@ -181,7 +181,7 @@
 			dev.off()
 #_____________________________________________________________________________________________________________________________
 # 4) fit a basic VAST model
-# Error structure: Tweedie
+# Error structure: delta-gamma
 # Fixed effects: Year
 # Random effects: spatial + spatiotemporal
 
@@ -192,11 +192,11 @@
 								 fine_scale=fine_scale,
 								 purpose="index2",
 								 use_anisotropy = FALSE,
-								 FieldConfig=matrix( c(0,0,rep("IID",4)), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
+								 FieldConfig=matrix( c(rep("IID",6)), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=bias.correct,
 								 max_cells=Inf,
-								 ObsModel=c(10,2))
+								 ObsModel=c(2,3))
 		settings$grid_size_km = 0.5
 		# settings$Options = c( settings$Options, "report_additional_variables"=TRUE )
 
@@ -331,6 +331,8 @@
 # 6) Make plots
 # covariate effects
 	bfish_df$pred = fit$Report$D_i
+	bfish_df$pred_1 = fit$Report$R1_i
+	bfish_df$pred_2 = fit$Report$R2_i
 	bfish_dt = as.data.table(bfish_df)
 	# year
 		# p = bfish_dt %>% .[,.(weight_kg,pred,year)] %>%
@@ -354,6 +356,34 @@
 			ggsave(filename=paste0("nominal_predicted_index.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
+
+		p = bfish_dt %>% .[,.(weight_kg,pred_1,year)] %>%
+						 .[,weight_kg:=ifelse(weight_kg>0,1,0)] %>%
+						 .[,year:=as.numeric(year)] %>%
+						 setnames(.,c("weight_kg","pred_1"),c("observed","expected")) %>%
+						 melt(.,id.vars="year") %>%
+						 .[,.(value=mean(value)),by=.(year,variable)] %>%
+						 ggplot() + 
+						 xlab("Year") +
+						 ylab("Response") +
+						 geom_path(aes(x = year, y = value, color=variable))
+			ggsave(filename=paste0("enc.nominal_predicted_index.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+		
+		p = bfish_dt %>% .[,.(weight_kg,pred_2,year)] %>%
+						 .[weight_kg>0] %>%
+						 .[,year:=as.numeric(year)] %>%
+						 setnames(.,c("weight_kg","pred_2"),c("observed","expected")) %>%
+						 melt(.,id.vars="year") %>%
+						 .[,.(value=mean(value)),by=.(year,variable)] %>%
+						 ggplot() + 
+						 xlab("Year") +
+						 ylab("Response") +
+						 geom_path(aes(x = year, y = value, color=variable))
+			ggsave(filename=paste0("pos.nominal_predicted_index.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
 	# lon
 		p = bfish_dt %>% .[,.(weight_kg,pred,lon)] %>%
 						 .[,lon:=floor(lon/0.25)*0.25] %>%
@@ -367,10 +397,36 @@
 					ggsave(filename=paste0("response_lon.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
-
-		p0 = bfish_dt %>% .[,.(weight_kg,pred,lon)] %>%
+		p = bfish_dt %>% .[,.(weight_kg,pred_1,lon)] %>%
+						 .[,weight_kg:=ifelse(weight_kg>0,1,0)] %>%
 						 .[,lon:=floor(lon/0.25)*0.25] %>%
-						 .[,.(pred=mean(pred)),by=lon] %>%
+ 						 setnames(.,c("weight_kg","pred_1"),c("observed","expected")) %>%
+						 .[,.(expected=mean(expected),observed=mean(observed)),by=lon] %>%
+ 						 melt(.,id.vars="lon") %>%
+						 ggplot() + 
+						 xlab("Longitude") +
+						 ylab("Response") +
+						 geom_line(aes(x = lon, y = value, color=variable))
+					ggsave(filename=paste0("enc.response_lon.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+		p = bfish_dt %>% .[,.(weight_kg,pred_2,lon)] %>%
+						 .[weight_kg>0] %>%
+						 .[,lon:=floor(lon/0.25)*0.25] %>%
+ 						 setnames(.,c("weight_kg","pred_2"),c("observed","expected")) %>%
+						 .[,.(expected=mean(expected),observed=mean(observed)),by=lon] %>%
+ 						 melt(.,id.vars="lon") %>%
+						 ggplot() + 
+						 xlab("Longitude") +
+						 ylab("Response") +
+						 geom_line(aes(x = lon, y = value, color=variable))
+					ggsave(filename=paste0("pos.response_lon.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+		p0 = bfish_dt %>% .[,.(weight_kg,pred_1,lon)] %>%
+						 .[,lon:=floor(lon/0.25)*0.25] %>%
+						 .[,.(pred=mean(pred_1)),by=lon] %>%
 						 .[,pred:=pred/mean(pred)]
 
 		p = bfish_dt %>% .[,.(year,lon)] %>%
@@ -384,7 +440,27 @@
 						 geom_hline(yintercept=1,linetype="dotted") +
 						 geom_line(aes(x = year, y = pred))	+
 						 geom_point(aes(x=year,y=pred,color=lon),size=3)					 
-					ggsave(filename=paste0("influ_lon.png"), plot = p, device = "png", path = working_dir,
+					ggsave(filename=paste0("enc.influ_lon.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+		p0 = bfish_dt %>% .[,.(weight_kg,pred_2,lon)] %>%
+						 .[,lon:=floor(lon/0.25)*0.25] %>%
+						 .[,.(pred=mean(pred_2)),by=lon] %>%
+						 .[,pred:=pred/mean(pred)]
+
+		p = bfish_dt %>% .[,.(year,lon)] %>%
+						 .[,year:=as.numeric(year)] %>%
+						 .[,lon:=floor(lon/0.25)*0.25] %>%				 
+						 merge(.,p0) %>%
+						 .[,.(pred=mean(pred),lon=mean(lon)),by=year] %>%
+						 ggplot() + 
+						 xlab("Year") +
+						 ylab("Influence") +
+						 geom_hline(yintercept=1,linetype="dotted") +
+						 geom_line(aes(x = year, y = pred))	+
+						 geom_point(aes(x=year,y=pred,color=lon),size=3)					 
+					ggsave(filename=paste0("pos.influ_lon.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 	# lat
@@ -400,10 +476,36 @@
 					ggsave(filename=paste0("response_lat.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
-
-		p0 = bfish_dt %>% .[,.(weight_kg,pred,lat)] %>%
+		p = bfish_dt %>% .[,.(weight_kg,pred_1,lat)] %>%
+						 .[,weight_kg:=ifelse(weight_kg>0,1,0)] %>%
 						 .[,lat:=floor(lat/0.25)*0.25] %>%
-						 .[,.(pred=mean(pred)),by=lat] %>%
+ 						 setnames(.,c("weight_kg","pred_1"),c("observed","expected")) %>%
+						 .[,.(expected=mean(expected),observed=mean(observed)),by=lat] %>%
+ 						 melt(.,id.vars="lat") %>%
+						 ggplot() + 
+						 xlab("Latitude") +
+						 ylab("Response") +
+						 geom_line(aes(x = lat, y = value, color=variable))
+					ggsave(filename=paste0("enc.response_lat.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+		p = bfish_dt %>% .[,.(weight_kg,pred_2,lat)] %>%
+						 .[weight_kg>0] %>%
+						 .[,lat:=floor(lat/0.25)*0.25] %>%
+ 						 setnames(.,c("weight_kg","pred_2"),c("observed","expected")) %>%
+						 .[,.(expected=mean(expected),observed=mean(observed)),by=lat] %>%
+ 						 melt(.,id.vars="lat") %>%
+						 ggplot() + 
+						 xlab("Latitude") +
+						 ylab("Response") +
+						 geom_line(aes(x = lat, y = value, color=variable))
+					ggsave(filename=paste0("pos.response_lat.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+		p0 = bfish_dt %>% .[,.(weight_kg,pred_1,lat)] %>%
+						 .[,lat:=floor(lat/0.25)*0.25] %>%
+						 .[,.(pred=mean(pred_1)),by=lat] %>%
 						 .[,pred:=pred/mean(pred)]
 
 		p = bfish_dt %>% .[,.(year,lat)] %>%
@@ -416,8 +518,28 @@
 						 ylab("Influence") +
 						 geom_hline(yintercept=1,linetype="dotted") +
 						 geom_line(aes(x = year, y = pred))	+
-						 geom_point(aes(x=year,y=pred,color=lat),size=3)
-					ggsave(filename=paste0("influ_lat.png"), plot = p, device = "png", path = working_dir,
+						 geom_point(aes(x=year,y=pred,color=lat),size=3)					 
+					ggsave(filename=paste0("enc.influ_lat.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+		p0 = bfish_dt %>% .[,.(weight_kg,pred_2,lat)] %>%
+						 .[,lat:=floor(lat/0.25)*0.25] %>%
+						 .[,.(pred=mean(pred_2)),by=lat] %>%
+						 .[,pred:=pred/mean(pred)]
+
+		p = bfish_dt %>% .[,.(year,lat)] %>%
+						 .[,year:=as.numeric(year)] %>%
+						 .[,lat:=floor(lat/0.25)*0.25] %>%				 
+						 merge(.,p0) %>%
+						 .[,.(pred=mean(pred),lat=mean(lat)),by=year] %>%
+						 ggplot() + 
+						 xlab("Year") +
+						 ylab("Influence") +
+						 geom_hline(yintercept=1,linetype="dotted") +
+						 geom_line(aes(x = year, y = pred))	+
+						 geom_point(aes(x=year,y=pred,color=lat),size=3)					 
+					ggsave(filename=paste0("pos.influ_lat.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -442,6 +564,52 @@
 			geom_point(aes(x=Lon,y=Lat,color=value)) +	
 			viridis::scale_color_viridis("Response",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
 		ggsave(filename=paste0("pred_bio.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+		d_dt = as.data.table(fit$Report$R1_gct) %>%
+			   .[,.(Site,Time,value)] %>%
+			   setnames(.,c("Site","Time"),c("knot","year")) %>%
+			   .[,knot:=as.numeric(knot)] %>%
+			   .[,year:=as.numeric(year)] 
+
+		g_dt = as.data.table(Extrapolation_List$Data_Extrap)
+		g_dt$knot = spatial_list$NN_Extrap$nn.idx
+
+		g_dt.list = lapply(unique(bfish_df$year),function(x,dt){tmp=copy(dt)%>%.[,year:=x];return(tmp)},dt=g_dt)
+		g_annual_dt = rbindlist(g_dt.list) %>% .[,year:=as.numeric(year)] %>% merge(.,d_dt,by=c("year","knot"))
+		
+		p = g_annual_dt %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x=Lon,y=Lat,color=value)) +	
+			viridis::scale_color_viridis("Response",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+		ggsave(filename=paste0("pred_enc.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+		
+		d_dt = as.data.table(fit$Report$R2_gct) %>%
+			   .[,.(Site,Time,value)] %>%
+			   setnames(.,c("Site","Time"),c("knot","year")) %>%
+			   .[,knot:=as.numeric(knot)] %>%
+			   .[,year:=as.numeric(year)] 
+
+		g_dt = as.data.table(Extrapolation_List$Data_Extrap)
+		g_dt$knot = spatial_list$NN_Extrap$nn.idx
+
+		g_dt.list = lapply(unique(bfish_df$year),function(x,dt){tmp=copy(dt)%>%.[,year:=x];return(tmp)},dt=g_dt)
+		g_annual_dt = rbindlist(g_dt.list) %>% .[,year:=as.numeric(year)] %>% merge(.,d_dt,by=c("year","knot"))
+		
+		p = g_annual_dt %>%
+			ggplot() + 
+			facet_wrap(~year) +
+			xlab("Longitude") +
+			ylab("Latitude") +
+			geom_point(aes(x=Lon,y=Lat,color=value)) +	
+			viridis::scale_color_viridis("Response",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+		ggsave(filename=paste0("pred_pos.png"), plot = p, device = "png", path = working_dir,
 	  			scale = 1.25, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 # index

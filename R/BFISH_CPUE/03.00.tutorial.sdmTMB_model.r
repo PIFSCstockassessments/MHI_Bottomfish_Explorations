@@ -4,11 +4,12 @@
 # 04/14/2022
 # Set up simple spatiotemporal model example using sdmTMB
 # 1) Bring data (including spatial data)
-# 2) Set-up barrier mesh (including conversion to equal distant projection)
-# 3) Fit single species (e.g. prfi - Opakapaka) model using Tweedie distribution
-# 4) Examine diagnostics
-# 5) Make predictions on PSU grid & examine outputs
-# 6) Calculate index
+# 2) Outlier check
+# 3) Set-up barrier mesh (including conversion to equal distant projection)
+# 4) Fit single species (e.g. prfi - Opakapaka) model using Tweedie distribution
+# 5) Examine diagnostics
+# 6) Make predictions on PSU grid & examine outputs
+# 7) Calculate index
 
 # This combines topics covered in sdmTMB vignettes (https://pbs-assess.github.io/sdmTMB/index.html)
 
@@ -36,7 +37,12 @@
 #_____________________________________________________________________________________________________________________________
 # 1) bring in data
 	load(file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_long_dt.RData"))
-	# subset to single species
+	# collapse weight_kg across bait_type
+		sample_weight_dt = bfish_combined_long_dt[,.(weight_kg=sum(weight_kg)),by=.(sample_id,species_cd)]
+		unique_dt = copy(bfish_combined_long_dt) %>% .[,bait_type:=NULL] %>% .[,weight_kg:=NULL] %>% unique(.)
+		bfish_combined_long_dt = merge(unique_dt,sample_weight_dt,by=c("sample_id","species_cd"))
+	
+	# subset to species
 	bfish_df = bfish_combined_long_dt %>% .[species_cd == "prfi"] %>% as.data.frame(.)
 	# needed to define spatial domain and for predicting on to create index
 	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
@@ -46,8 +52,18 @@
 	# needed for plotting and defining the barrier feature
 	hi_coast = rgdal::readOGR(dsn = paste0(proj.dir,"Data/GIS/Coastline"), layer = "Coastline")
 	hi_coast_sf = sf::st_as_sf(hi_coast)
+
 #_____________________________________________________________________________________________________________________________
-# 2) set-up spatial domain
+# 2) check for outliers & remove
+# apply Hampel filter (https://statsandr.com/blog/outliers-detection-in-r/)
+# Won't work for "apru" since MAD is 0
+
+	# med_weight = median(bfish_df$weight_kg)
+	# MAD = median(abs(bfish_df$weight_kg - med_weight))
+	# if(MAD == 0)
+
+#_____________________________________________________________________________________________________________________________
+# 3) set-up spatial domain
 	# convert to equal distant projection
 		# get original lat-lon crs
 		crs_ll = sp::CRS(sp::proj4string(hi_coast))
@@ -125,7 +141,7 @@
 			legend("bottomleft",legend=c("normal knot","barrier knot","normal edge","barrier edge","knot boundary","land"),lwd=c(NA,NA,1,1,3,1),pch=c(16,16,NA,NA,NA,NA),col=c(normal_col,barrier_col,normal_col,barrier_col,boundary_col,NA),fill=c(NA,NA,NA,NA,NA,land_col),border=c(NA,NA,NA,NA,NA,"black"),bty="n",cex=1.5)
 
 #_____________________________________________________________________________________________________________________________
-# 3) fit a basic sdmTMB model
+# 4) fit a basic sdmTMB model
 # Error structure: Tweedie
 # Fixed effects: Year
 # Random effects: spatial + spatiotemporal
@@ -142,7 +158,7 @@
 	print(paste0(round((B-A)[3],digits=2)," seconds to fit spatiotemporal model"))
 
 #_____________________________________________________________________________________________________________________________
-# 4) Model diagnostics & plot output
+# 5) Model diagnostics & plot output
 	# need to simulate responses to calculate DHARMa style residuals
 	# can use built in functions from sdmTMB package but DHARMa package has some built in tests/plots
 	set.seed(123)
@@ -176,7 +192,7 @@
 		DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
 
 #_____________________________________________________________________________________________________________________________
-# 5) Make predictions across model domain (all PSUs across years)
+# 6) Make predictions across model domain (all PSUs across years)
 		# expand psu_table by year
 			psu_table.list = lapply(unique(bfish_df$year),function(x,dt){tmp=copy(dt)%>%.[,year:=x];return(tmp)},dt=psu_table)
 			psu_table_annual = rbindlist(psu_table.list)
@@ -243,7 +259,7 @@
 			scale_color_gradient2("Est. spatiotemporal random effects",low="blue",high="red")
 
 #_____________________________________________________________________________________________________________________________
-# 6) Calculate index
+# 7) Calculate index
 		index_dt = predict_psu_sim %>% .[,.(value=mean(exp(value))),by=.(year,variable)] %>%
 							.[,.(est=quantile(value,probs=0.5),lwr=quantile(value,probs=0.025),upr=quantile(value,probs=0.975),log_est=mean(log(value)),se=sd(log(value))),by=year]
 		index_regional_dt = predict_psu_sim %>% .[,.(value=mean(exp(value))),by=.(year,Island,variable)] %>%
