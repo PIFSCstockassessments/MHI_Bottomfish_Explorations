@@ -196,7 +196,7 @@
 								 fine_scale=fine_scale,
 								 purpose="index2",
 								 use_anisotropy = FALSE,
-								 FieldConfig=matrix( rep("IID",6), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
+								 FieldConfig=matrix( c("IID","IID","IID","IID","IID","IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=bias.correct,
 								 max_cells=Inf,
@@ -222,14 +222,11 @@
           						extrapolation_list = Extrapolation_List,
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
-    	  						spatial_list = spatial_list,build_model=FALSE,test_fit=TRUE)
-		fit_setup$parameter_estimates$SD
+    	  						spatial_list = spatial_list,build_model=TRUE,test_fit=FALSE)
 		
-		# turn off estimation of variance for spatiotemporal random effect for 3rd category (species)
-		# and fix to low value since goes to zero when freely estimated
-		modified_map = fit_setup$tmb_list$Map
-
-		modified_parameters = fit_setup$tmb_list$Parameters
+		# turn off estimation of components if poorly estimated
+		fit_setup$parameter_estimates$SD
+		settings$FieldConfig = matrix( c("IID","IID","IID",0,0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
 
 		fit = fit_model( settings=settings,
  				   				Lon_i=bfish_df$lon,
@@ -249,9 +246,8 @@
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
     	  						spatial_list = spatial_list,
-    	  						Map = modified_map,
-    	  						Parameters = modified_parameters,
     	  						test_fit=TRUE)
+		fit$parameter_estimates$SD
 
 		# Sdreport = fit$parameter_estimates$SD
 		# par_biascorrect = TMB:::as.list.sdreport( Sdreport, what="Est. (bias.correct)", report=TRUE )

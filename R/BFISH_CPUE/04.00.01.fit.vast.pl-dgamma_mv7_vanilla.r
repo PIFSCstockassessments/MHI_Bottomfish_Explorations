@@ -1,11 +1,11 @@
 
 
 # Nicholas Ducharme-Barth
-# 08/17/2022
+# 09/08/2022
 # Set up simple spatiotemporal model example using VAST
 # 1) Bring data (including spatial data)
 # 2) Set-up barrier mesh (including conversion to equal distant projection)
-# 3) Fit multivariate model using delta-Gamma distribution, add functionality to sum biomass across categories
+# 3) Fit multivariate model using Poisson-link delta-Gamma model, add functionality to sum biomass across categories
 # 4) Examine diagnostics
 # 5) Calculate index
 
@@ -29,7 +29,7 @@
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
-	working_dir = paste0(proj.dir,"VAST/model_runs/dgamma_mv7_vanilla/")
+	working_dir = paste0(proj.dir,"VAST/model_runs/pl-dgamma_mv7_vanilla/")
 	dir.create(working_dir,recursive=TRUE)
 
 #_____________________________________________________________________________________________________________________________
@@ -188,6 +188,32 @@
 # Error structure: delta-gamma
 # Fixed effects: Year
 # Random effects: spatial + spatiotemporal
+	
+	# make mean-variance plots
+		meanvar_dt = as.data.table(bfish_df) %>%
+					 .[weight_kg>0] %>%
+					 .[,.(mean=log(mean(weight_kg)),var=log(var(weight_kg)),.N),by=.(year,species_cd)] %>%
+					 .[!is.na(var)&is.finite(var)]
+		meanvar_lm = lm(formula = meanvar_dt$var ~ meanvar_dt$mean)
+		text_dt = data.table(x=1,y=0,label=paste0("slope = ",round(meanvar_lm$coefficients[2],digits=2)))
+
+
+		p = copy(meanvar_dt) %>%
+			.[,species_cd:=factor(species_cd,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"),labels=c("Opakapaka", "Ehu", "Onaga", "Kalekale", "Gindai", "Hapuupuu", "Lehi"))] %>%
+			ggplot() +
+			xlab("log(Mean)") +
+			ylab("log(Variance)") +
+			geom_abline(slope=1,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
+			geom_abline(slope=2,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
+			geom_abline(slope=3,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
+			geom_abline(slope=meanvar_lm$coefficients[2],intercept=meanvar_lm$coefficients[1],linetype="dashed",color="black",size=2) +			
+			geom_point(aes(x=mean,y=var,fill=species_cd,size=N),shape=21) +
+			theme_few(base_size=20) +
+			geom_text(data=text_dt,aes(x=x,y=y,label=label),size=7) +
+     		viridis::scale_fill_viridis("Species\ncode",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			ggsave(filename=paste0("mean_var.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
 
 	# make settings
 		bias.correct = FALSE
@@ -200,7 +226,7 @@
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=bias.correct,
 								 max_cells=Inf,
-								 ObsModel=c(2,3))
+								 ObsModel=c(2,4))
 		settings$grid_size_km = 0.5
 		settings$Options = c( settings$Options, "range_fraction"=0.01 )
 
@@ -224,19 +250,19 @@
           						extrapolation_list = Extrapolation_List,
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
-    	  						spatial_list = spatial_list,build_model=FALSE,test_fit=TRUE)
+    	  						spatial_list = spatial_list,build_model=TRUE,test_fit=FALSE)
 		# fit_setup$parameter_estimates$SD
 		
 		# turn off estimation of variance for spatiotemporal random effect for 3rd category (species)
 		# and fix to low value since goes to zero when freely estimated
 		modified_map = fit_setup$tmb_list$Map
-		modified_map$L_omega1_z = factor(c(1,2,3,NA,4,NA,5),levels=c(1,2,3,4,5))
+		modified_map$L_omega1_z = factor(c(1,2,3,4,5,NA,NA),levels=c(1,2,3,4,5))
 		modified_map$L_epsilon1_z = factor(c(1,2,NA,3,4,5,6),levels=c(1,2,3,4,5,6))
 		modified_map$L_omega2_z = factor(c(1,2,3,NA,4,NA,NA),levels=c(1,2,3,4))
 		modified_map$L_epsilon2_z = factor(c(1,2,NA,3,4,5,NA),levels=c(1,2,3,4,5))
 
 		modified_parameters = fit_setup$tmb_list$Parameters
-		modified_parameters$L_omega1_z = c(1,1,1,0.00001,1,0.00001,1)
+		modified_parameters$L_omega1_z = c(1,1,1,1,1,0.00001,0.00001)
 		modified_parameters$L_epsilon1_z = c(1,1,0.00001,1,1,1,1)
 		modified_parameters$L_omega2_z = c(1,1,1,0.00001,1,0.00001,0.00001)
 		modified_parameters$L_epsilon2_z = c(1,1,0.00001,1,1,1,0.00001)

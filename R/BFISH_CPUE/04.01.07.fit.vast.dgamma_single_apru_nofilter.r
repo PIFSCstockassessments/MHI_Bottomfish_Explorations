@@ -5,7 +5,7 @@
 # Set up simple spatiotemporal model example using VAST
 # 1) Bring data (including spatial data)
 # 2) Set-up barrier mesh (including conversion to equal distant projection)
-# 3) Fit single species (etco) model using delta-Gamma distribution
+# 3) Fit single species (apru) model using delta-Gamma distribution
 # 4) Examine diagnostics
 # 5) Calculate index
 
@@ -29,7 +29,7 @@
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
-	working_dir = paste0(proj.dir,"VAST/model_runs/dgamma_single_etco/")
+	working_dir = paste0(proj.dir,"VAST/model_runs/dgamma_single_apru_nofilter/")
 	dir.create(working_dir,recursive=TRUE)
 
 #_____________________________________________________________________________________________________________________________
@@ -45,10 +45,10 @@
 		bfish_combined_long_dt = merge(unique_dt,sample_weight_dt,by=c("sample_id","species_cd"))
 	
 	# subset to species
-	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% c("etco")] %>% as.data.frame(.)
+	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% c("apru")] %>% as.data.frame(.)
 	
-	# remove sample with large lehi observation
-	bfish_df =  subset(bfish_df,sample_id!="20210831_183445")
+	# # remove sample with large lehi observation
+	# bfish_df =  subset(bfish_df,sample_id!="20210831_183445")
 	
 	# needed to define spatial domain and for predicting on to create index
 	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
@@ -196,7 +196,7 @@
 								 fine_scale=fine_scale,
 								 purpose="index2",
 								 use_anisotropy = FALSE,
-								 FieldConfig=matrix( rep("IID",6), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
+								 FieldConfig=matrix( c("IID","IID","IID","IID","IID","IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=bias.correct,
 								 max_cells=Inf,
@@ -211,8 +211,8 @@
           						t_i=as.integer(bfish_df$year),
           						b_i=bfish_df$weight_kg,
           						a_i=rep(pi * (0.02760333457^2),nrow(bfish_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
-	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c("etco")))-1,
-	    	  					category_names=c("etco"),
+	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c("apru")))-1,
+	    	  					category_names=c("apru"),
 	    	  					covariate_data = NULL,
 	    	  					catchability_data = NULL,
           						working_dir = working_dir,
@@ -222,11 +222,11 @@
           						extrapolation_list = Extrapolation_List,
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
-    	  						spatial_list = spatial_list,build_model=TRUE,test_fit=TRUE)
+    	  						spatial_list = spatial_list,build_model=TRUE,test_fit=FALSE)
 		
 		# turn off estimation of components if poorly estimated
 		fit_setup$parameter_estimates$SD
-		# settings$FieldConfig = matrix( c("IID","IID","IID",0,0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
+		settings$FieldConfig = matrix( c("IID","IID","IID",0,0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
 
 		fit = fit_model( settings=settings,
  				   				Lon_i=bfish_df$lon,
@@ -234,8 +234,8 @@
           						t_i=as.integer(bfish_df$year),
           						b_i=bfish_df$weight_kg,
           						a_i=rep(pi * (0.02760333457^2),nrow(bfish_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
-	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c("etco")))-1,
-	    	  					category_names=c("etco"),
+	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c("apru")))-1,
+	    	  					category_names=c("apru"),
 	    	  					covariate_data = NULL,
 	    	  					catchability_data = NULL,
           						working_dir = working_dir,
@@ -246,39 +246,13 @@
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
     	  						spatial_list = spatial_list,
-    	  						test_fit=TRUE)
+    	  						test_fit=FALSE)
 		fit$parameter_estimates$SD
 
 		# Sdreport = fit$parameter_estimates$SD
 		# par_biascorrect = TMB:::as.list.sdreport( Sdreport, what="Est. (bias.correct)", report=TRUE )
 
 		index = plot_biomass_index( fit,DirName=working_dir)
-
-		# re-fit model with 2nd component turned off
-		dir.create(paste0(working_dir,"simple/"),recursive=TRUE)
-
-		settings$FieldConfig = matrix( c("IID","IID","IID",0,0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
-		fit_simple = fit_model( settings=settings,
- 				   				Lon_i=bfish_df$lon,
-    			   				Lat_i=bfish_df$lat,
-          						t_i=as.integer(bfish_df$year),
-          						b_i=bfish_df$weight_kg,
-          						a_i=rep(pi * (0.02760333457^2),nrow(bfish_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
-	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c("etco")))-1,
-	    	  					category_names=c("etco"),
-	    	  					covariate_data = NULL,
-	    	  					catchability_data = NULL,
-          						working_dir = paste0(working_dir,"simple/"),
-          						newtonsteps = 1,
-          						# extrapolation list args
-          						projargs=slot(crs_eqd,"projargs"),input_grid=input_grid,
-          						extrapolation_list = Extrapolation_List,
-          						# spatial list args
-    	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
-    	  						spatial_list = spatial_list,
-    	  						test_fit=FALSE)
-		fit_simple$parameter_estimates$SD
-		index_simple = plot_biomass_index( fit,DirName=paste0(working_dir,"simple/"))
 
 # #_____________________________________________________________________________________________________________________________
 # # 5) Model diagnostics & plot output
