@@ -293,5 +293,583 @@
 		index = plot_biomass_index( fit,DirName=working_dir)
 		index_agg = plot_biomass_index( fit_agg,DirName=paste0(working_dir,"agg/"))
 
+		save(fit,file=paste0(working_dir,"fit.RData"))
+		save(fit_agg,file=paste0(working_dir,"agg/fit_agg.RData"))
+		bfish_df$pred_weight_kg = fit$Report$D_i
+		bfish_dt = as.data.table(bfish_df)		
+		save(bfish_dt,file=paste0(working_dir,"bfish_dt.RData"))
+		save(spatial_list,file=paste0(working_dir,"spatial_list.RData"))
+		save(Extrapolation_List,file=paste0(working_dir,"Extrapolation_List.RData"))
+
+		# calculate RMSE
+		rmse_agg_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)))] %>%
+				  .[,type:="agg"]
+		rmse_spec_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2))),by=species_cd] %>%
+				  setnames(.,"species_cd","type")
+		rmse_year_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2))),by=year] %>%
+				  setnames(.,"year","type")
+		rmse_island_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2))),by=island] %>%
+				  setnames(.,"island","type")
+		rmse_gear_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2))),by=gear_type] %>%
+				  setnames(.,"gear_type","type")
+		rmse_strata_dt = copy(bfish_dt) %>%
+				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2))),by=strata] %>%
+				  setnames(.,"strata","type")				  
+		rmse_dt = rbind(rmse_agg_dt,rmse_spec_dt,rmse_year_dt,rmse_island_dt,rmse_gear_dt,rmse_strata_dt)
+		fwrite(rmse_dt,file=paste0(working_dir,"rmse_dt.csv"))
+
+#_____________________________________________________________________________________________________________________________
+# 5) Model diagnostics & plot output
+	# need to simulate responses to calculate DHARMa style residuals
+	# can use built in functions from sdmTMB package but DHARMa package has some built in tests/plots
+	n_sim = 500
+	sim_fit = matrix(NA,nrow=length(fit$data_list$b_i),ncol=n_sim)
+	rs = 123
+	for(i in 1:n_sim)
+	{
+		sim_dat = simulate_data( fit,type = 1,random_seed = list(rs+i,NULL)[[1+is.null(rs)]])
+		sim_fit[,i] = sim_dat$b_i
+	}
+
+	save(sim_fit,file=paste0(working_dir,"sim_fit.RData"))
 
 
+	pred = fit$Report$D_i
+	residuals_dharma =  DHARMa::createDHARMa(simulatedResponse = sim_fit,observedResponse = bfish_df$weight_kg,fittedPredictedResponse = pred)	
+
+	residual_dt = data.table(type="agg",
+							KS_stat=NA,
+							KS_pvalue=NA,
+							dispersion_stat=NA,
+							dispersion_pvalue=NA,
+							outlier_stat=NA,
+							outlier_pvalue=NA,
+							zinf_stat=NA,
+							zinf_pvalue=NA,
+							moran_pvalue=NA,
+							DW_stat=NA,
+							DW_pvalue=NA)
+
+	# basic QQ & residual v. predicted plot
+	 	png(filename = paste0(working_dir,"dharma_agg_qq.png"),width = 16, height = 9, units = "in",res=300)
+			plot(residuals_dharma)
+		dev.off()
+	# residual v. predicted by model covariate
+		png(filename = paste0(working_dir,"dharma_agg_resid_year.png"),width = 9, height = 9, units = "in",res=300)
+			DHARMa::plotResiduals(residuals_dharma, form = as.factor(bfish_df$year))
+		dev.off()
+		png(filename = paste0(working_dir,"dharma_agg_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
+			DHARMa::plotResiduals(residuals_dharma, form = bfish_df$lon)
+		dev.off()
+		png(filename = paste0(working_dir,"dharma_agg_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
+			DHARMa::plotResiduals(residuals_dharma, form = bfish_df$lat)
+		dev.off()
+	# test for uniformity in residuals, overdispersion, outliers
+	 	png(filename = paste0(working_dir,"dharma_agg_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
+			resid_test = DHARMa::testResiduals(residuals_dharma)
+		dev.off()
+	# test for zero inflation
+	 	png(filename = paste0(working_dir,"dharma_agg_test_zi.png"),width = 9, height = 9, units = "in",res=300)
+			zinf_test = DHARMa::testZeroInflation(residuals_dharma)
+		dev.off()
+	# test for over-dispersion
+	 	png(filename = paste0(working_dir,"dharma_agg_test_od.png"),width = 9, height = 9, units = "in",res=300)
+			DHARMa::testDispersion(residuals_dharma,alternative="two.sided")
+		dev.off()
+	# test for spatial autocorrelation
+	# DHARMa::testSpatialAutocorrelation needs unique locations
+		bfish_df$spatial_group = as.numeric(as.factor(paste0(bfish_df$lon,"_",bfish_df$lat)))
+		spatial_group_dt = data.table(spatial_group=bfish_df$spatial_group,x=bfish_df$lon,y=bfish_df$lat) %>%
+					   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
+		residuals_spatial_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$spatial_group)	
+	 	png(filename = paste0(working_dir,"dharma_agg_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
+			dharma_sp = DHARMa::testSpatialAutocorrelation(residuals_spatial_group, x = spatial_group_dt$x, y = spatial_group_dt$y)
+			text(min(spatial_group_dt$x),min(spatial_group_dt$y),paste0("Moran's I p-value: ",round(dharma_sp$p.value,digits=2)),adj=c(0,0))
+		dev.off()
+	# test for temporal autocorrelation
+		bfish_df$temporal_group = factor(bfish_df$year,levels=as.character(sort(unique(bfish_df$year))))
+		residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
+	 	png(filename = paste0(working_dir,"dharma_agg_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
+			resid_autocorr_test = DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
+		dev.off()
+
+
+		residual_dt$KS_stat=resid_test$uniformity$statistic
+		residual_dt$KS_pvalue=resid_test$uniformity$p.value
+		residual_dt$dispersion_stat=resid_test$dispersion$statistic
+		residual_dt$dispersion_pvalue=resid_test$dispersion$p.value
+		residual_dt$outlier_stat=resid_test$outliers$statistic
+		residual_dt$outlier_pvalue=resid_test$outliers$p.value
+		residual_dt$zinf_stat=zinf_test$statistic
+		residual_dt$zinf_pvalue=zinf_test$p.value
+		residual_dt$moran_pvalue=dharma_sp$p.value
+		residual_dt$DW_stat=resid_autocorr_test$statistic
+		residual_dt$DW_pvalue=resid_autocorr_test$p.value
+
+	# calc residuals by species
+		u_species = unique(bfish_df$species_cd)
+
+		residual_dt.list = as.list(rep(NA,length(u_species)))
+		for(i in 1:length(u_species))
+		{
+			residual_dt.list[[i]] = data.table(type=u_species[i],
+							KS_stat=NA,
+							KS_pvalue=NA,
+							dispersion_stat=NA,
+							dispersion_pvalue=NA,
+							outlier_stat=NA,
+							outlier_pvalue=NA,
+							zinf_stat=NA,
+							zinf_pvalue=NA,							
+							moran_pvalue=NA,
+							DW_stat=NA,
+							DW_pvalue=NA)
+
+			tmp_idx = which(bfish_df$species_cd == u_species[i])
+			tmp_bfish = bfish_df[tmp_idx,]
+			tmp_residuals = residuals_dharma
+			tmp_residuals$simulatedResponse = tmp_residuals$simulatedResponse[tmp_idx,]
+			tmp_residuals$observedResponse = tmp_residuals$observedResponse[tmp_idx]
+			tmp_residuals$nObs = length(tmp_idx)
+			tmp_residuals$scaledResiduals = tmp_residuals$scaledResiduals[tmp_idx]
+			tmp_residuals$fittedPredictedResponse = tmp_residuals$fittedPredictedResponse[tmp_idx]
+
+			# basic QQ & residual v. predicted plot
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_qq.png"),width = 16, height = 9, units = "in",res=300)
+						plot(tmp_residuals)
+					dev.off()
+				# residual v. predicted by model covariate
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_resid_year.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::plotResiduals(tmp_residuals, form = as.factor(tmp_bfish$year))
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::plotResiduals(tmp_residuals, form = tmp_bfish$lon)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::plotResiduals(tmp_residuals, form = tmp_bfish$lat)
+					dev.off()
+				# test for uniformity in residuals, overdispersion, outliers
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
+						tmp_test = DHARMa::testResiduals(tmp_residuals)
+					dev.off()
+				# test for zero inflation
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_zi.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_zinf = DHARMa::testZeroInflation(tmp_residuals)
+					dev.off()
+				# test for over-dispersion
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_od.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::testDispersion(tmp_residuals,alternative="two.sided")
+					dev.off()
+				# test for spatial autocorrelation
+				# DHARMa::testSpatialAutocorrelation needs unique locations
+					tmp_bfish$spatial_group = as.numeric(as.factor(paste0(tmp_bfish$lon,"_",tmp_bfish$lat)))
+					tmp_spatial_group_dt = data.table(spatial_group=tmp_bfish$spatial_group,x=tmp_bfish$lon,y=tmp_bfish$lat) %>%
+								   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
+					tmp_residuals_spatial_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$spatial_group)	
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_dharma_sp = DHARMa::testSpatialAutocorrelation(residuals_spatial_group, x = tmp_spatial_group_dt$x, y = tmp_spatial_group_dt$y)
+						text(min(tmp_spatial_group_dt$x),min(tmp_spatial_group_dt$y),paste0("Moran's I p-value: ",round(tmp_dharma_sp$p.value,digits=2)),adj=c(0,0))
+					dev.off()
+				# test for temporal autocorrelation
+					tmp_bfish$temporal_group = factor(tmp_bfish$year,levels=as.character(sort(unique(tmp_bfish$year))))
+					tmp_residuals_temporal_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$temporal_group)	
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
+						tmp_ar = DHARMa::testTemporalAutocorrelation(tmp_residuals_temporal_group, time=levels(tmp_bfish$temporal_group))
+					dev.off()
+
+
+				residual_dt.list[[i]]$KS_stat=tmp_test$uniformity$statistic
+				residual_dt.list[[i]]$KS_pvalue=tmp_test$uniformity$p.value
+				residual_dt.list[[i]]$dispersion_stat=tmp_test$dispersion$statistic
+				residual_dt.list[[i]]$dispersion_pvalue=tmp_test$dispersion$p.value
+				residual_dt.list[[i]]$outlier_stat=tmp_test$outliers$statistic
+				residual_dt.list[[i]]$outlier_pvalue=tmp_test$outliers$p.value
+				residual_dt.list[[i]]$zinf_stat=tmp_zinf$statistic
+				residual_dt.list[[i]]$zinf_pvalue=tmp_zinf$p.value				
+				residual_dt.list[[i]]$moran_pvalue=tmp_dharma_sp$p.value
+				residual_dt.list[[i]]$DW_stat=tmp_ar$statistic
+				residual_dt.list[[i]]$DW_pvalue=tmp_ar$p.value
+
+				# clean-up
+					rm(list=c("tmp_zinf","tmp_test","tmp_ar","tmp_idx","tmp_bfish","tmp_residuals","tmp_spatial_group_dt","tmp_dharma_sp","tmp_residuals_spatial_group","tmp_residuals_temporal_group"))
+		}
+		
+
+		residual_dt = rbind(residual_dt,rbindlist(residual_dt.list))
+		fwrite(residual_dt,file=paste0(working_dir,"residual_dt.csv"))
+
+#_____________________________________________________________________________________________________________________________
+# 6) Make plots
+# predicted density
+		deep7_code_vec = tolower(c("ETCA","APRU","PRSI","HYQU","PRFI","PRZO","ETCO"))
+		deep7_name_vec = c("Ehu", "Lehi", "Kalekale", "Hapu'upu'u", "'Opakapaka", "Gindai", "Onaga")
+		
+
+		# predict on annual psu table
+			predict_knot = as.data.table(drop_units(fit$Report$D_gct)) %>%
+				setnames(.,c("Site","Category","Time","value"),c("knot","species","year","density")) %>%
+				.[,knot:=as.numeric(as.character(knot))] %>%
+				.[,species:=factor(species,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+				.[,species_hw:=deep7_name_vec[match(species,deep7_code_vec)]] %>%
+				.[,year:=as.numeric(as.character(year))] %>%
+				.[,.(species,species_hw,year,knot,density)] %>%
+				.[order(species,year,knot)]
+
+				knot_coords = spatial_list$latlon_x[,2:1]
+				knot_sp = sp::SpatialPoints(knot_coords)
+				sp::proj4string(knot_sp) = crs_ll
+				knot_sp_eqd = sp::spTransform(knot_sp, crs_eqd)
+				knot_loc_dt = data.table(knot=1:nrow(knot_coords),lon=knot_sp@coords[,1],lat=knot_sp@coords[,2],lon_eqd=knot_sp_eqd@coords[,1],lat_eqd=knot_sp_eqd@coords[,2])
+			predict_knot = merge(predict_knot,knot_loc_dt,by="knot")
+
+
+			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
+				.[,knot:=1:nrow(fit$Report$Omega1_gc)] %>%
+				melt(.,id.vars="knot") %>%
+				setnames(.,c("variable","value"),c("species","omega1"))
+			omega2_dt = as.data.table(fit$Report$Omega2_gc) %>%
+				.[,knot:=1:nrow(fit$Report$Omega2_gc)] %>%
+				melt(.,id.vars="knot") %>%
+				setnames(.,c("variable","value"),c("species","omega2"))
+			omega_dt = merge(omega1_dt,omega2_dt,by=c("knot","species"))
+
+			epsilon1_dt = as.data.table(fit$Report$Epsilon1_gct) %>%
+				.[,knot:=as.numeric(as.character(Site))] %>%
+				.[,species:=factor(Category,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+				.[,year:=as.numeric(as.character(Time))] %>%
+				setnames(.,"value","epsilon1") %>%
+				.[,.(knot,species,year,epsilon1)]
+			epsilon2_dt = as.data.table(fit$Report$Epsilon2_gct) %>%
+				.[,knot:=as.numeric(as.character(Site))] %>%
+				.[,species:=factor(Category,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+				.[,year:=as.numeric(as.character(Time))] %>%
+				setnames(.,"value","epsilon2") %>%
+				.[,.(knot,species,year,epsilon2)]
+			epsilon_dt = merge(epsilon1_dt,epsilon2_dt,by=c("year","knot","species"))
+
+
+			encounter_dt =	as.data.table(fit$Report$R1_gct) %>%
+				.[,knot:=as.numeric(as.character(Site))] %>%
+				.[,species:=factor(Category,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+				.[,year:=as.numeric(as.character(Time))] %>%
+				setnames(.,"value","encounter_prob") %>%
+				.[,.(knot,species,year,encounter_prob)]
+
+			positive_dt =	as.data.table(fit$Report$R2_gct) %>%
+				.[,knot:=as.numeric(as.character(Site))] %>%
+				.[,species:=factor(Category,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+				.[,year:=as.numeric(as.character(Time))] %>%
+				setnames(.,"value","positive_catch") %>%
+				.[,.(knot,species,year,positive_catch)]
+			component_dt = merge(encounter_dt,positive_dt,by=c("year","knot","species"))
+
+			spatial_residual_dt = data.table(PSU=bfish_df$psu,year=as.numeric(as.character(bfish_df$year)),species=bfish_df$species_cd,residual=residuals_dharma$scaledResiduals)
+
+				psu_table$knot = fit$spatial_list$NN_Extrap$nn.idx
+			predict_psu = merge(psu_table,predict_knot[,.(knot,species,species_hw,year,density)],by="knot",allow.cartesian=TRUE) %>%
+						  .[,area_km2:=0.5^2] %>%
+						  merge(.,omega_dt,by=c("knot","species")) %>%
+						  merge(.,epsilon_dt,by=c("year","knot","species")) %>%
+						  merge(.,component_dt,by=c("year","knot","species")) %>%
+						  merge(.,spatial_residual_dt,by=c("PSU","year","species"),all.x=TRUE)
+
+		save(predict_psu,file=paste0(working_dir,"predict_psu.RData"))
+
+			p = copy(predict_psu) %>%
+				.[,.(biomass=sum(density),lon_eqd=mean(lon_eqd),lat_eqd=mean(lat_eqd)),by=.(Island,PSU,knot,year)] %>%
+				ggplot() + 
+				facet_wrap(~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = biomass),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				viridis::scale_color_viridis("Est. density",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+			ggsave(filename=paste0("pred_dens_agg.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+			# plot random effects
+				p = copy(predict_psu) %>%
+					.[,.(knot,species,omega1,omega2)] %>%
+					unique(.) %>%
+					melt(.,id.vars=c("knot","species")) %>%
+					.[,variable:=factor(variable,levels=c("omega1","omega2"),labels=c("Omega 1","Omega 2"))] %>%
+					ggplot() +
+					ggtitle("Spatial random effect") +
+					facet_wrap(~variable) +
+					xlab("Species") +
+					ylab("Random effect") +
+					geom_hline(yintercept=0) +
+					geom_boxplot(aes(x=species,y=value,fill=species)) +
+					ggthemes::theme_few(base_size=20) + 
+					viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			ggsave(filename=paste0("pred_omega_agg.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)	
+				
+				p = copy(predict_psu) %>%
+					.[,.(knot,year,species,epsilon1,epsilon2)] %>%
+					unique(.) %>%
+					melt(.,id.vars=c("knot","species","year")) %>%
+					.[,variable:=factor(variable,levels=c("epsilon1","epsilon2"),labels=c("Epsilon 1","Epsilon 2"))] %>%
+					ggplot() +
+					ggtitle("Spatiotemporal random effect") +
+					facet_wrap(~variable) +
+					xlab("Species") +
+					ylab("Random effect") +
+					geom_hline(yintercept=0) +
+					geom_boxplot(aes(x=species,y=value,fill=species)) +
+					ggthemes::theme_few(base_size=20) + 
+					viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			ggsave(filename=paste0("pred_epsilon_agg.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)				
+
+				# trim tails function comes from
+				# https://stackoverflow.com/questions/44628130/ggplot2-dealing-with-extremes-values-by-setting-a-continuous-color-scale
+				trim_tails <- function(range = c(-Inf, Inf)) scales::trans_new("trim_tails", 
+	                transform = function(x) {
+	                  force(range)
+	                  desired_breaks <- scales::extended_breaks(n = 7)(x[x >= range[1] & x <= range[2]])
+	                  break_increment <- diff(desired_breaks)[1]
+	                  x[x < range[1]] <- range[1] - break_increment
+	                  x[x > range[2]] <- range[2] + break_increment
+	                  x
+	                },
+	                inverse = function(x) x,
+
+	                breaks = function(x) {
+	                  force(range)
+	                  scales::extended_breaks(n = 7)(x)
+	                },
+	                format = function(x) {
+	                  force(range)
+	                  x[1] <- paste("<", range[1])
+	                  x[length(x)] <- paste(">", range[2])
+	                  x
+	                })
+
+			for(i in 1:length(u_species))
+			{
+
+				p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(biomass=sum(density),lon_eqd=mean(lon_eqd),lat_eqd=mean(lat_eqd)),by=.(Island,PSU,knot,year)] %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = biomass),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				viridis::scale_color_viridis("Est. density",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+				ggsave(filename=paste0("pred_dens_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	  			# omega
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(PSU,knot,lon_eqd,lat_eqd,omega1,omega2)] %>%
+				unique(.) %>%
+				melt(.,id.vars=c("PSU","knot","lon_eqd","lat_eqd")) %>%
+				.[,variable:=factor(variable,levels=c("omega1","omega2"),labels=c("Omega 1","Omega 2"))] %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(~variable) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = value),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				scale_color_gradient2("Spatial\nrandom\neffect",low = "blue",mid = "gray90",high ="red",trans = trim_tails(range = c(-3,3))) 
+				ggsave(filename=paste0("pred_omega_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	  			# epsilon
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(PSU,year,knot,lon_eqd,lat_eqd,epsilon1,epsilon2)] %>%
+				unique(.) %>%
+				melt(.,id.vars=c("PSU","year","knot","lon_eqd","lat_eqd")) %>%
+				.[,variable:=factor(variable,levels=c("epsilon1","epsilon2"),labels=c("Epsilon 1","Epsilon 2"))] %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_grid(variable~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = value),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				scale_color_gradient2("Spatiotemporal\nrandom\neffect",low = "blue",mid = "gray90",high ="red",trans = trim_tails(range = c(-3,3))) 
+				ggsave(filename=paste0("pred_epsilon_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	  			# encounter
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(PSU,year,knot,lon_eqd,lat_eqd,encounter_prob)] %>%
+				unique(.) %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = encounter_prob),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				viridis::scale_color_viridis("Encounter\nprobability",begin = 0.1,end = 0.8,direction = 1,option = "H")
+				ggsave(filename=paste0("pred_enc_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+	  			
+	  			# positive
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(PSU,year,knot,lon_eqd,lat_eqd,positive_catch)] %>%
+				unique(.) %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, color = positive_catch),size=0.05) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				viridis::scale_color_viridis("Positive\ncatch",begin = 0.1,end = 0.8,direction = 1,option = "H",trans="log10")
+				ggsave(filename=paste0("pred_pos_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(Island,PSU,year,knot,lon_eqd,lat_eqd,residual)] %>%
+				.[!is.na(residual)] %>%
+				unique(.) %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(Island~year,nrow=5,scales="free") +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, fill = residual),shape=21,color="white",size=0.75) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few() + 
+				scale_fill_gradient2("PIT\nresidual",low = "blue",mid = "gray90",high ="red",midpoint=0.5) 
+				ggsave(filename=paste0("pred_residual_psu_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	  			p = copy(predict_psu) %>%
+				.[species==u_species[i]] %>%
+				.[,.(PSU,year,knot,lon_eqd,lat_eqd,residual)] %>%
+				.[!is.na(residual)] %>%
+				.[,.(residual=mean(residual,na.rm=TRUE)),by=.(year,knot)] %>%
+				merge(.,unique(predict_knot[,.(knot,lon_eqd,lat_eqd)]),by="knot") %>%
+				unique(.) %>%
+				ggplot() + 
+				ggtitle(paste0(unique(predict_psu[species==u_species[i]]$species_hw)," (",toupper(u_species[i]),")")) +
+				facet_wrap(~year) +
+				xlab("Eastings") +
+				ylab("Northings") +
+				geom_point(aes(x = lon_eqd, y = lat_eqd, fill = residual),color="white",size=2.25,shape=21) +
+				# geom_sf(data=hi_coast_eqd_sf,fill=NA,alpha=0.5) +
+				ggthemes::theme_few(base_size=20) + 
+				scale_fill_gradient2("PIT\nresidual",low = "blue",mid = "gray90",high ="red",midpoint=0.5) 
+				ggsave(filename=paste0("pred_residual_knot_",u_species[i],".png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+			}
+
+	mv_dt = as.data.table(index$Table) %>%
+			.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+			.[Stratum=="Stratum_1"] %>%
+			.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
+			.[,Model:="mv"] %>%
+			setnames(.,"Std. Error for ln(Estimate)","CV") %>%
+			.[,.(Model,Category,Time,Estimate,CV)] %>%
+			.[,Estimate:=Estimate*2.20462262185] %>%
+			  .[,Estimate:=Estimate/1000000] %>%
+			  .[,l95:=exp(log(Estimate)-2*CV)] %>%
+			  .[,u95:=exp(log(Estimate)+2*CV)]
+	mv_agg_dt = as.data.table(index_agg$Table) %>%
+			.[Category=="Category_7"] %>%
+			.[,Category:="agg"] %>%
+			.[Stratum=="Stratum_1"] %>%
+			.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
+			.[,Model:="mv"] %>%
+			setnames(.,"Std. Error for ln(Estimate)","CV") %>%
+			.[,.(Model,Category,Time,Estimate,CV)] %>%
+			.[,Estimate:=Estimate*2.20462262185] %>%
+			  .[,Estimate:=Estimate/1000000] %>%
+			  .[,l95:=exp(log(Estimate)-2*CV)] %>%
+			  .[,u95:=exp(log(Estimate)+2*CV)]
+
+index_dt = rbind(mv_dt,mv_agg_dt)
+
+p = copy(index_dt) %>%
+	  .[Category!="agg"] %>%
+	ggplot() +
+	ylim(0,NA) +
+	ylab("Predicted biomass (millions lbs)") +
+	xlab("Year") +
+	facet_wrap(~Category,scales="free") +
+	geom_hline(yintercept=0) +
+	geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Category),alpha=0.25) +
+	geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),size=1.5) +
+	viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	theme_few(base_size=20)
+	ggsave(filename=paste0("index_by_species.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+
+p = copy(index_dt) %>%
+	  .[Category!="agg"] %>%
+	  .[,Estimate:=Estimate/mean(Estimate),by=Category] %>%
+			  .[,l95:=exp(log(Estimate)-2*CV)] %>%
+			  .[,u95:=exp(log(Estimate)+2*CV)] %>%	  
+	ggplot() +
+	ylim(0,NA) +
+	ylab("Relative abundance") +
+	xlab("Year") +
+	facet_wrap(~Category,scales="free") +
+	geom_hline(yintercept=0) +
+	geom_hline(yintercept=1,linetype="dashed") +
+	geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Category),alpha=0.25) +
+	geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),size=1.5) +
+	viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	theme_few(base_size=20)
+	ggsave(filename=paste0("index_by_species_relative.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+p = copy(index_dt) %>%
+	  .[Category!="agg"] %>%
+	ggplot() +
+	ylim(0,NA) +
+	ylab("Predicted biomass (millions lbs)") +
+	xlab("Year") +
+	geom_hline(yintercept=0) +
+	geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Category,fill=Category),alpha=0.25) +
+	geom_area(aes(x=Time,y=Estimate,group=Category,fill=Category)) +
+	geom_path(data=index_dt[Category=="agg"],aes(x=Time,y=Estimate),color="black",size=1.25) +
+	geom_point(data=index_dt[Category=="agg"],aes(x=Time,y=Estimate),color="black",size=4) +
+	geom_segment(data=index_dt[Category=="agg"],aes(x=Time,xend=Time,y=l95,yend=u95),color="black",size=1.25) +
+	# geom_ribbon(data=index_dt[Category=="agg"],aes(x=Time,ymin=l95,ymax=u95),color="black",linetype="dashed",fill=NA,size=1.25) +
+	viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+	theme_few(base_size=20)
+	ggsave(filename=paste0("index_by_species_stack.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
