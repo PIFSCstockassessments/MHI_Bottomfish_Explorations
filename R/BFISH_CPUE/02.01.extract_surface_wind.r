@@ -29,10 +29,8 @@
 		unique_dt = copy(bfish_combined_long_dt) %>% .[,bait_type:=NULL] %>% .[,weight_kg:=NULL] %>% unique(.)
 		bfish_combined_long_dt = merge(unique_dt,sample_weight_dt,by=c("sample_id","species_cd"))
 	
-	# subset to species
 	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% c("prfi","etco","etca","prsi","przo","hyqu","apru")] %>% as.data.frame(.)
 
-	# remove sample with large lehi observation
 	sample_dt = as.data.table(bfish_df) %>%
 			   .[,year:=as.numeric(as.character(year))] %>%
 			   .[,season:=toupper(substr(season,1,1))] %>%
@@ -112,6 +110,15 @@
 		# tmp_sample_dt
 		tmp_match_dt = wind_dt[match(nn_id,wind_dt$st_id),.(lon,lat,isodate,time,speed_ms,speed_kt,direction)]
 		# tmp_match_dt
+		# for 7 missing observations from 2017-11-15 (PacIOOS has no predictions for 2017-11-16 UTC)
+		if(u_windfile[i] == "2017_F")
+		{
+			missing_id = which(is.na(tmp_match_dt$speed_ms))
+			nn_id[missing_id] = paste0(nn_lon[missing_id],"_",nn_lat[missing_id],"_",nn_isodate[missing_id],"_14")
+			tmp_match_dt = wind_dt[match(nn_id,wind_dt$st_id),.(lon,lat,isodate,time,speed_ms,speed_kt,direction)]
+			rm(list=c("missing_id"))
+		}
+
 		sample_wind_dt.list[[i]] = cbind(tmp_sample_dt,tmp_match_dt[,.(speed_ms,speed_kt,direction)]) %>%
 								   .[,direction_d:=as.character(NA)] %>%
 								   .[direction>=337.5 | direction<22.5,direction_d :="N"] %>%
@@ -122,7 +129,12 @@
 								   .[direction>=202.5 & direction<247.5,direction_d :="SW"] %>%
 								   .[direction>=247.5 & direction<292.5,direction_d :="W"] %>%
 								   .[direction>=292.5 & direction<337.5,direction_d :="NW"] %>%
-								   .[,direction_d:=factor(direction_d,levels=c("N","NE","E","SE","S","SW","W","NW"))]
+								   .[,direction_d:=factor(direction_d,levels=c("N","NE","E","SE","S","SW","W","NW"))] %>%
+								   .[,speed_mph:=speed_kt*1.15077945] %>%
+								   .[,beaufort:=cut(speed_ms,breaks=c(0,0.5,1.6,3.4,5.5,8,10.8,13.9,17.2,20.8,24.5,28.5,32.7,100),labels=FALSE)-1]								   
+		# calculate difference in distance and time between sample and wind observation
+			sample_wind_dt.list[[i]]$temporal_diff_hours = abs(((as.numeric(as.POSIXct(as.character(tmp_sample_dt$isodate),format="%Y%m%d")) + tmp_sample_dt$time*60*60) -	(as.numeric(as.POSIXct(as.character(tmp_match_dt$isodate),format="%Y%m%d")) + tmp_match_dt$time*60*60))/(60*60))
+			sample_wind_dt.list[[i]]$spatial_diff_km = geosphere::distHaversine(as.matrix(tmp_sample_dt[,.(lon,lat)]),as.matrix(tmp_match_dt[,.(lon,lat)]))/1000
 
 		# p = sample_wind_dt.list[[i]] %>%
 		# 	ggplot() +
@@ -142,3 +154,140 @@
 	sample_wind_dt = rbindlist(sample_wind_dt.list)
 	save(sample_wind_dt,file=paste0(proj.dir,"Data/sample_wind_dt.RData"))
 
+
+#_____________________________________________________________________________________________________________________________
+# 3) make some summary plots
+	load(file=paste0(proj.dir,"Data/sample_wind_dt.RData"))
+	plot_dir = paste0(proj.dir,"Plot/BFISH_CPUE/")
+
+	wind_plot_dt = merge(bfish_combined_long_dt,sample_wind_dt[,.(sample_id,speed_ms,speed_kt,speed_mph,beaufort,direction,direction_d)],by="sample_id")
+
+	p = copy(wind_plot_dt) %>%
+		.[,bin:=ifelse(weight_kg>0,1,0)] %>%
+		.[,wind_floor:=floor(speed_kt)] %>%
+		.[,.(encounter=mean(bin),.N),by=.(species_cd,gear_type,wind_floor)] %>%
+		.[,species_cd:=factor(species_cd,levels=c("prfi","etca","etco","prsi","przo","hyqu","apru"),labels=c("Opakapaka", "Ehu", "Onaga", "Kalekale", "Gindai", "Hapuupuu", "Lehi"))] %>%
+		ggplot() +
+		ylab("Empirical encounter rate") +
+		xlab("Wind speed (kt)") +
+		facet_wrap(~species_cd,scales="free_y") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_point(aes(x=wind_floor,y=encounter,fill=gear_type,size=N),shape=21) +
+		geom_smooth(aes(x=wind_floor,y=encounter,color=gear_type,weight=N),se=FALSE) +
+		theme_few(base_size=20) +
+     	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			
+		ggsave(filename=paste0("wind_encounter_species.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	p = copy(wind_plot_dt) %>%
+		.[,.(weight_kg=sum(weight_kg),speed_kt=mean(speed_kt)),by=.(sample_id,gear_type)] %>%
+		.[,bin:=ifelse(weight_kg>0,1,0)] %>%
+		.[,wind_floor:=floor(speed_kt)] %>%
+		.[,.(encounter=mean(bin),.N),by=.(gear_type,wind_floor)] %>%
+		ggplot() +
+		ylab("Empirical encounter rate") +
+		xlab("Wind speed (kt)") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_point(aes(x=wind_floor,y=encounter,fill=gear_type,size=N),shape=21) +
+		geom_smooth(aes(x=wind_floor,y=encounter,color=gear_type,weight=N),se=FALSE) +
+		theme_few(base_size=20) +
+     	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
+		ggsave(filename=paste0("wind_encounter.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	p = copy(wind_plot_dt) %>%
+		.[,.(weight_kg=sum(weight_kg),speed_kt=mean(speed_kt)),by=.(sample_id,gear_type,island)] %>%
+		.[,bin:=ifelse(weight_kg>0,1,0)] %>%
+		.[,wind_floor:=floor(speed_kt)] %>%
+		.[,.(encounter=mean(bin),.N),by=.(gear_type,wind_floor,island)] %>%
+		ggplot() +
+		facet_wrap(~island,scales="free_y") +
+		ylab("Empirical encounter rate") +
+		xlab("Wind speed (kt)") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_point(aes(x=wind_floor,y=encounter,fill=gear_type,size=N),shape=21) +
+		geom_smooth(aes(x=wind_floor,y=encounter,color=gear_type,weight=N),se=FALSE) +
+		theme_few(base_size=20) +
+     	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
+		ggsave(filename=paste0("wind_encounter_island.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	p = copy(wind_plot_dt) %>%
+		.[,.(weight_kg=sum(weight_kg),speed_kt=mean(speed_kt)),by=.(sample_id,gear_type)] %>%
+		.[weight_kg>0] %>%
+		.[,wind_floor:=floor(speed_kt)] %>%
+		.[,.(positive_catch=mean(weight_kg),.N),by=.(gear_type,wind_floor)] %>%
+		ggplot() +
+		facet_wrap(~gear_type,scales="free_y") +
+		ylab("Positive catch (kg)") +
+		xlab("Wind speed (kt)") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_point(aes(x=wind_floor,y=positive_catch,fill=gear_type,size=N),shape=21) +
+		geom_smooth(aes(x=wind_floor,y=positive_catch,color=gear_type,weight=N),se=FALSE) +
+		theme_few(base_size=20) +
+     	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
+		ggsave(filename=paste0("wind_poscatch.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+
+	p = copy(wind_plot_dt) %>%
+		.[,.(weight_kg=sum(weight_kg),speed_kt=mean(speed_kt)),by=.(sample_id,gear_type,island)] %>%
+		.[weight_kg>0] %>%
+		.[,wind_floor:=floor(speed_kt)] %>%
+		.[,.(positive_catch=mean(weight_kg),.N),by=.(gear_type,wind_floor,island)] %>%
+		ggplot() +
+		facet_grid(gear_type~island,scales="free_y") +
+		ylab("Positive catch (kg)") +
+		xlab("Wind speed (kt)") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_point(aes(x=wind_floor,y=positive_catch,fill=gear_type,size=N),shape=21) +
+		geom_smooth(aes(x=wind_floor,y=positive_catch,color=gear_type,weight=N),se=FALSE) +
+		theme_few(base_size=20) +
+     	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
+		ggsave(filename=paste0("wind_poscatch_island.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	p = copy(sample_wind_dt) %>%
+		merge(.,as.data.table(bfish_df)[,.(sample_id,gear_type)]) %>%
+		.[,time_floor:=floor(time)] %>%
+		.[,time_floor:=factor(time_floor)] %>%
+		ggplot() +
+		ylab("Wind speed (kt)") +
+		xlab("Time of day (24h)") +
+		ylim(0,NA) +
+		geom_hline(yintercept=0) +
+		geom_boxplot(aes(x=time_floor,y=speed_kt,fill=gear_type)) +
+		theme_few(base_size=20) +
+     	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
+		ggsave(filename=paste0("wind_time.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
+
+	p = copy(sample_wind_dt) %>%
+		merge(.,as.data.table(bfish_df)[,.(sample_id,island)]) %>%
+		ggplot() +
+		ylab("Latitude") +
+		xlab("Longitude") +
+		facet_wrap(~island,scales="free") +
+		geom_point(aes(x=lon,y=lat,fill=speed_kt),shape=21,size=2) +
+		theme_few(base_size=20) +
+     	viridis::scale_fill_viridis("Wind\nspeed (kt)",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=FALSE)		
+		ggsave(filename=paste0("wind_lonlat.png"), plot = p, device = "png", path = plot_dir,
+	  			scale = 1, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)		
