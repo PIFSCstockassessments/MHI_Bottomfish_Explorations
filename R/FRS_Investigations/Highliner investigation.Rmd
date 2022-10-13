@@ -1,0 +1,170 @@
+---
+title: "Highliner investigation"
+date: "July 5, 2022"
+author: "John Syslo"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Explore various measures for the prominence of highliners in the data.
+
+1954-1958 have more limited information on fisher (only 30% of records) and may not be reliable.  Fisher informationm was not available for 1976, which is omitted. Conclusions should notbe drawn for 2022, which is a partial year. 
+
+```{r, echo=FALSE}
+
+#data8<-read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Raw FRS depredation\\data8_2021data.csv") 
+fulldata=read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Raw FRS depredation\\tdata6_2021_2021data.csv") #this file was actually confirmed to include data into 2022
+#dim(fulldata)
+#names(fulldata)[89]<-"uku_lbs"   ##x is uku_lbs
+red_to_finaltrip=fulldata[,c("FYEAR","FISHED","trip2","AREA","HOURS","days","houreffort","dayeffort","deep7_lbs","fisher","cum_exp","qtr","uku_lbs","cpue")]  #no "HA_NO", with 2021 data
+unique_trip<-unique(red_to_finaltrip)     #"lbs", - had to remove this before applying unique function, because it was given for each species
+#dim(unique_trip) 221902     15
+
+
+#read in data after filtering step 8 (removes FI survey obs)
+#data8 has 690K rows, ultimately used ~220k in standardization.....
+
+#need unique trips - d7 already summed by trip
+
+#data9<-data8[,c( "CYEAR","FYEAR","deep7_lbs", "trip2","fisher")]
+#unique_trip<-unique(data9) #drops it to 129,000 records - seems like too few...
+
+
+#hln_1<-tapply(data8$deep7_lbs,list(data8$FYEAR,data8$fisher),sum)
+
+hln_1<-tapply(unique_trip$deep7_lbs,list(unique_trip$FYEAR,unique_trip$fisher),sum)
+#first column is spurious...
+
+hln_1<-hln_1[,-1]
+
+totes<-rowSums(hln_1,na.rm=T)
+
+props<-apply(hln_1,2,function(x){x/totes})
+
+#run through all years
+
+yr<-74 #seq(1:75) #1976 doesn't have fisher, 74 years with 1976 removed
+perc<-seq(0.1,1.0,0.1)
+
+props<-props[-29,] #remove 1976
+
+Props_all<-array(NA,dim=c(length(perc),2,yr))
+
+for (i in (1:yr)){
+  props_yr<-props[i,]
+  props_yr<-props_yr[!is.na(props_yr)] 
+  
+  y<-cumsum(rev(sort(props_yr)))  #need rev to account for minimum number of anglers catching x%??
+  
+  ones_yr<-as.data.frame(cbind(y,1))
+  names(ones_yr)[2]<-"yeah"
+  ones_yr$cum_count<-cumsum(ones_yr$yeah)
+  
+  for (j in 1:length(perc)){
+    ab<-ones_yr[which.min(abs(ones_yr$y - perc[j])),]
+    Props_all[j,1,i]<-ab$y #cumulative catch (nearest actual percentage to perc)
+    Props_all[j,2,i]<-ab$cum_count/dim(ones_yr)[1] #cumulative percentage of fishers
+  }  
+  
+}
+
+plot_yrs<-c((1948:1975),(1977:2022))
+
+
+#add number of fishers each year - number of fishers reporting is low in early years
+get_unique<-function(x){length(unique(x))}
+num_fishers<-tapply(fulldata$fisher,fulldata$FYEAR,get_unique)
+num_fishers<-num_fishers[-29]
+
+#make barplot first and add percentage line over
+par(mar=c(5,4,4,4))
+
+barplot(num_fishers, col = "360",              # Create bar plot without axes #C0C0C0
+        axes = FALSE, xlab = "", ylab = "")
+axis(side = 4, at = pretty(range(num_fishers)))      # Add second axis
+mtext("Number of fishers", side = 4, line = 2)             # Add second axis label
+par(new = TRUE)   
+
+plot(Props_all[9,2,]~plot_yrs,type="o",lwd=2,xaxt = "n",xlab="Year",ylab="Proportion",main="Proportion of annual fishers responsible for 90% of Deep7 catch") #proportion of fishers catching 90% of catch over time
+
+#80%
+plot(Props_all[8,2,]~plot_yrs,xlab="Year",ylab="Proportion",main="Proportion of annual fishers responsible for 80% of Deep7 catch",type="o") #proportion of fishers catching 80% of catch over time
+
+#70%
+plot(Props_all[7,2,]~plot_yrs,xlab="Year",ylab="Proportion",main="Proportion of annual fishers responsible for 70% of Deep7 catch",type="o") #proportion of fishers catching 70% of catch over time
+
+
+################################################################################################################################
+#Evaluate the proportion of fishers catching 2500, 1000 lbs of Deep 7 per year (Following Hospital and Beavers 2014)
+
+catches<-hln_1
+
+highline_1000<-ifelse(catches>=1000,1,0)
+
+highline_2500<-ifelse(catches>=2500,1,0)
+
+valid<-function(x){return(length(x[!is.na(x)]))}
+
+props_1000<-rowSums(highline_1000,na.rm=T)/apply(highline_1000,1,valid)
+props_1000<-props_1000[-29] #Somehow 1976 snuck back in
+plot(props_1000~plot_yrs, xlab="Year", ylab="Proportion", main = "Proportion of fishers catching 1000 lb",type="o")
+
+
+props_2500<-rowSums(highline_2500,na.rm=T)/apply(highline_2500,1,valid)
+props_2500<-props_2500[-29]
+plot(props_2500~plot_yrs,xlab="Year", ylab="Proportion", main ="Proportion of fishers catching 2500 lb",type="o")
+
+#rowSums(highline_2500,na.rm=T) #number of anglers catching 2500 lb+ each year
+
+```
+
+Hospital and Beavers (2014) defined highliners as fishers with at least 2500 lb of Deep 7 catch in a given year and also looked at 1000 lb.
+
+
+```{r, echo=FALSE}
+
+####################################################################################################################################
+#which fishers are highliners, and are they leaving the fishery??
+
+#rather than 10 percentiles for catch, we will get the top XX fishers each year
+perc<-1:10
+
+fishers_all<-array(NA,dim=c(length(perc),yr))
+
+for (i in (1:yr)){
+  props_yr<-props[i,]
+  props_yr<-props_yr[!is.na(props_yr)] 
+  
+  y<-(rev(sort(props_yr)))  #need rev to account for minimum number of anglers catching x%??
+  
+  fishers_all[,i]<-names(y)[1:length(perc)]
+ 
+  
+}
+
+#fishers_all  #how do we quantify changes or turnover here?  how many in top 20 in given year were in the top 20 in previous year? or something....
+
+
+before<-array(NA,dim=c(length(perc),yr))
+
+for (i in 2:yr){
+  for (j in 1:length(perc)){
+  before[j,i]<-ifelse(fishers_all[j,i]%in%fishers_all[,i-1],1,0)
+     }
+}
+
+
+
+#colSums(before)
+
+plot(colSums(before)/length(perc)~plot_yrs,xlab="Year", ylab="Proportion", main="Proportion of fishers in top 10 in consecutive years year")
+
+
+
+```
+
+The above plot displays the proportion of fishers in the top 10 in year y (in terms of deep 7 catch) that were also in the top 10 the previous year.
+

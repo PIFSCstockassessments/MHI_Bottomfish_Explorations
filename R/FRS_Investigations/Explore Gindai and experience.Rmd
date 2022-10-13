@@ -1,0 +1,88 @@
+---
+title: "Gindai evaluation"
+author: "John Syslo"
+date: "July 18, 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r, echo=FALSE}
+fulldata=read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Raw FRS depredation\\tdata6_2021_2021data.csv") #this file was 
+
+
+#Determine amount of Gindai caught in each trip and add to dataset
+gindai_lbs=aggregate(fulldata[fulldata$SPECIES==97,]$lbs,by=list("trip2"=fulldata[fulldata$SPECIES==97,]$trip2),sum)
+#merge records since many trips dont catch deep7
+####----#####
+fulldata2=merge(fulldata,gindai_lbs,by="trip2",all=TRUE)
+fulldata2[is.na(fulldata2$x),"x"]=0
+dimnames(fulldata2)[[2]][30]="gindai_lbs" 
+
+
+red_to_finaltrip=fulldata2[,c("FYEAR","FISHED","trip2","AREA","HOURS","days","houreffort","dayeffort","deep7_lbs","fisher","cum_exp","qtr","uku_lbs","cpue","gindai_lbs")]  #no "HA_NO", with 2021 data
+unique_trip<-unique(red_to_finaltrip)     #"lbs", - had to remove this before applying unique function, because it was given for each species
+
+unique_trip$prop_gindai<-unique_trip$gindai_lbs/unique_trip$deep7_lbs
+
+hist(unique_trip$cum_exp, breaks = 200)
+median(unique_trip$cum_exp) #57
+mean(unique_trip$cum_exp) #300
+  
+#plot(unique_trip$prop_gindai~unique_trip$cum_exp)
+
+un_trip_pos<-unique_trip[unique_trip$prop_gindai>0,]
+plot(un_trip_pos$prop_gindai~un_trip_pos$cum_exp) #plot positives only
+
+#plot(unique_trip$deep7_lbs~unique_trip$prop_gindai)
+plot(un_trip_pos$deep7_lbs~un_trip_pos$prop_gindai) #plot positives only
+cor(unique_trip$deep7_lbs,unique_trip$prop_gindai)
+
+cor(un_trip_pos$deep7_lbs,un_trip_pos$prop_gindai)
+
+tapply(unique_trip$cpue,unique_trip$FYEAR,mean, na.rm=T) #cpue is by day for early, hour for late periods
+
+recent_data=unique_trip[unique_trip$FISHED>="2002-10-01",]
+early_data=unique_trip[unique_trip$FISHED<"2002-10-01",]
+
+dim(early_data)
+dim(recent_data)
+
+hist(early_data$cum_exp, breaks = 200)
+median(early_data$cum_exp) #47
+mean(early_data$cum_exp) #333
+
+hist(recent_data$cum_exp, breaks = 200)
+median(recent_data$cum_exp) #96
+mean(recent_data$cum_exp) #205
+
+
+plot(early_data$cpue~early_data$prop_gindai)
+plot(recent_data$cpue~recent_data$prop_gindai)
+
+
+plot(early_data$cpue~early_data$cum_exp)
+plot(recent_data$cpue~recent_data$cum_exp)
+
+recent_noNA<-recent_data[!is.na(recent_data$prop_gindai),]
+recent_noNA<-recent_noNA[is.finite(recent_noNA$prop_gindai),]
+recent_noNA_pos<-recent_noNA[recent_noNA$deep7_lbs>0,]
+
+
+cor(recent_noNA$prop_gindai,recent_noNA$cum_exp)
+cor(recent_noNA_pos$prop_gindai,recent_noNA$cum_exp)
+plot(recent_noNA_pos$prop_gindai~recent_noNA_pos$cum_exp)
+
+#summary(lm(recent_data$cpue~recent_data$prop_gindai,na.rm=T))
+
+smooth<-loess(recent_noNA_pos$prop_gindai~recent_noNA_pos$cum_exp)
+y<-predict(smooth)
+plot(recent_noNA_pos$prop_gindai~recent_noNA_pos$cum_exp)
+lines(y~recent_noNA_pos$cum_exp,col=2)
+plot(y~recent_noNA_pos$cum_exp)
+```

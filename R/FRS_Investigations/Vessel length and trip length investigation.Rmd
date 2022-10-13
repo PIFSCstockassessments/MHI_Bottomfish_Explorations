@@ -1,0 +1,226 @@
+---
+title: "Vessel and day length investigations"
+author: "John Syslo"
+date: "July 5, 2022"
+output: html_document
+---
+
+## Explore vessel length data and relationship to trip length
+
+The following analyses evaluate CPUE using both hours (status quo) and single reporting days (as with early time series), and evaluate whether vessel length is informative with regard to trip length (in days) and CPUE.  
+
+```{r, echo=FALSE}
+#Read in data set that has day effort.  It has not been filtered down to unique trips yet
+#there are no wind data for the second time period in this single data set
+#In order to include field "HA_NO", the below file actually is based on the data pull from 2021 update assessment, with data only through 2018
+rm(list=ls())
+fulldata=read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\Raw FRS depredation\\tdata6_2021.csv")
+#dim(fulldata) 
+
+names(fulldata)[89]<-"uku_lbs"   ##x is uku_lbs
+red_to_finaltrip=fulldata[,c("FYEAR","FISHED","trip2","AREA","HOURS","days","houreffort","dayeffort","deep7_lbs","fisher","cum_exp","qtr","uku_lbs","HA_NO","cpue")]  
+unique_trip<-unique(red_to_finaltrip)     #"lbs", - had to remove this before applying unique function, because it was given for each species
+#dim(unique_trip)
+
+
+unique_trip$cpue_day<-unique_trip$deep7_lbs/unique_trip$dayeffort
+unique_trip$cpue_hour<-unique_trip$deep7_lbs/unique_trip$houreffort
+
+day_nom<-tapply(unique_trip$cpue_day,unique_trip$FYEAR,mean,na.rm=T)
+
+#Select later years and filter out Infs and NAs
+unique_trip_late<-unique_trip[unique_trip$houreffort!=0,]
+
+hour_nom<-tapply(unique_trip_late$cpue_hour,unique_trip_late$FYEAR,mean,na.rm=T) #still lots on Inf and NAs....can bring in from 2018 assessment
+
+plot(day_nom[56:71]~c(2003:2018),ylim=c(0,100),xlab="Year",ylab="Nominal CPUE")
+points(hour_nom~c(2003:2018),pch=2)
+legend(2004, 95, legend=c("Day", "Hour"),
+       pch=c(1,2), cex=0.8)
+
+
+day_stan<-day_nom[56:71]/mean(day_nom[56:71])
+hour_stan<-hour_nom/mean(hour_nom)
+
+
+plot(day_stan~c(2003:2018), ylim=c(0.7,1.3),xlab="Year",ylab="Centered nominal CPUE")
+points(hour_stan~c(2003:2018),pch=2)
+legend(2004, 1.25, legend=c("Day", "Hour"),
+       pch=c(1,2), cex=0.8)
+
+
+plot(hour_nom~day_nom[56:71],xlab="Day nominal",ylab="Hour nominal")
+```
+
+The correlation between mean nominal hourly CPUE and daily CPUE is 0.915.
+The following gives the nominal mean daily CPUE divided by the hourly CPUE for each year. The quotient is consistently around 6-7, reasonably lining up with the anual average effort in hours. If we wanted to test a model with a single cpue series using daily effort, it would likely give similar result to existing model.  This can be done as a sensitivity.
+
+```{r, echo = FALSE}
+#cor(day_nom[56:71],hour_nom) #0.9154 - highly corelated and standardized is similar to nominal...
+
+day_nom[56:71]/hour_nom #about 7 hours of fishing per day
+
+
+###now match up the vessel data  
+#Read in the vessel data
+
+current_vessel<-read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\CPUE standardization\\Vessel data\\Current_BFV_Reg_Info.csv")
+old_vessel<-read.csv("C:\\Users\\John.Syslo\\Documents\\2023 Deep 7\\CPUE standardization\\Vessel data\\Old_BFV_Reg_Info.csv")
+
+#dim(current_vessel)
+#dim(old_vessel)
+old_vessel<-old_vessel[,-11]
+#head(old_vessel)
+#head(current_vessel)
+all_vessels<-rbind(old_vessel,current_vessel)
+
+#dim(all_vessels)
+#length(unique(all_vessels$ha_no))
+#nearly 400 vessels included in both old and new data sets?
+
+ab<-all_vessels[order(all_vessels$ha_no),]
+
+vessel_dat<-merge(unique_trip, all_vessels, by.x="HA_NO", by.y="ha_no")# ,all.x=TRUE)
+#dim(vessel_dat)
+
+
+#want to be able to reduce to unique with which vessels were active in each year and average size
+#vessel_dat2<-vessel_dat[,c("HA_NO","FYEAR", "vessel_name", "vessel_length", "vessel_manufacturer","dayeffort","houreffort")] #This step deletes trips, but does not giv eunique #vessels each year
+
+#dim(vessel_dat2) # 222185      7
+
+#unique_vessels<-unique(vessel_dat2)
+#dim(unique_vessels) #because of multiple trips with different units of effort, etc, unique does not give a count of vessels....works for trip analysis though
+#[1] 28628     7
+
+#rename to avoid changing all code below
+
+unique_vessels<-vessel_dat
+
+valid<-function(x){return(length(!is.na(x)))}
+vess_num<-tapply(unique_vessels$vessel_length,unique_vessels$FYEAR,valid) #this is the number of trips each year
+plot(vess_num~c(1988, 1989,1992,1994:2018), xlab="Year",ylab="trips with vessel info") #som eyears missing and 1992 is low
+
+vess_88<-unique_vessels[unique_vessels$FYEAR>=1988,]
+
+vess_12<-vess_88[vess_88$vessel_length<100 & vess_88$vessel_length>5,] #2012 has an error in 2 vessel sizes   
+#hist(vess_12$vessel_length,breaks=20)
+
+#look at average length thru time
+vess_len<-tapply(vess_12$vessel_length,vess_12$FYEAR,mean,na.rm=T)
+plot(vess_len~c(1988, 1989,1992,1994:2018),main="Mean vessel length among trips through time",ylab="Vessel length", xlab="Year") 
+
+vess_len_med<-tapply(vess_12$vessel_length,vess_12$FYEAR,median,na.rm=T) #median is very consistent
+plot(vess_len_med~c(1988, 1989,1992,1994:2018),main="Median vessel length among trips through time",ylab="Vessel length", xlab="Year")
+
+
+
+#look at relationshipp between vessel length and day effort
+good_vessels<-vessel_dat[vessel_dat$vessel_length<100 & vessel_dat$vessel_length>5,]
+#plot(good_vessels$dayeffort~good_vessels$vessel_length)
+
+#day effort in general?
+hist(good_vessels$dayeffort, xlab="Effort in days", main="Distribution of effort in days")
+
+
+#jitter to see the points more?
+#plot(rnorm(length(good_vessels$dayeffort),good_vessels$dayeffort,0.05)~good_vessels$vessel_length)
+
+#symbol size related to data quantity
+obs<-tapply(good_vessels$dayeffort,list(good_vessels$dayeffort,good_vessels$vessel_length),length)
+#plot(good_vessels$dayeffort~good_vessels$vessel_length, cex=obs/2000)
+
+#Make a matrix for plotting the symbols
+pres<-matrix(NA,nrow=10,ncol=35)
+
+for (i in 1:nrow(obs)){
+for (j in 1:ncol(pres)){  
+pres[i,j]<-ifelse(obs[i,j]>=1,colnames(obs)[j],NA)
+}
+}
+
+
+pres_ones<-ifelse(pres=="NA",0,1)
+
+pres_vals<-matrix(NA,nrow=10,ncol=35)
+for (i in 1:nrow(pres_vals)){
+  for (j in 1:ncol(pres_vals)){  
+    pres_vals[i,j]<-ifelse(pres[i,j]>=1,i,NA)
+  }
+}
+
+
+
+pres_plot<-(rbind(colnames(obs),pres_vals))
+
+plot(pres_plot[2,]~pres_plot[1,],cex=obs[1,]/1000,ylim=c(0,11), main="Data since 1992",xlab = "Vessel length (ft)", ylab = "Trip length (Days)")
+points(pres_plot[3,]~pres_plot[1,],cex=obs[2,]/1000)
+points(pres_plot[4,]~pres_plot[1,],cex=obs[3,]/1000)
+points(pres_plot[5,]~pres_plot[1,],cex=obs[4,]/1000)
+points(pres_plot[6,]~pres_plot[1,],cex=obs[5,]/1000)
+points(pres_plot[7,]~pres_plot[1,],cex=obs[6,]/1000)
+points(pres_plot[8,]~pres_plot[1,],cex=obs[7,]/1000)
+points(pres_plot[9,]~pres_plot[1,],cex=obs[8,]/1000)
+points(pres_plot[10,]~pres_plot[1,],cex=obs[9,]/1000)
+points(pres_plot[11,]~pres_plot[1,],cex=obs[10,]/1000)
+
+#what is the average day leffort by vessel length
+days_by_size<-tapply(good_vessels$dayeffort, good_vessels$vessel_length,mean,na.rm=T)   
+#days_by_size
+plot(days_by_size~names(days_by_size), xlab="Vessel length", ylab= "Mean trip length (Days)") #somwhat of an increasing patterm which may support the assignment procedure
+
+days_by_size_median<-tapply(good_vessels$dayeffort, good_vessels$vessel_length,median,na.rm=T)   
+#days_by_size_median
+
+plot(days_by_size_median~names(days_by_size_median), xlab="Vessel length", ylab= "Median trip length (Days)") #somwhat of an increasing patterm which may support the assignment procedure
+```
+
+There is somwhat of an increasing pattern in day length with vessel size which may support the assignment procedure (number of days as a function of distance travelled), a question raised by the 2018 review panel.
+
+
+
+```{r, echo=FALSE}
+###############################################################
+#cpue by vessel length
+################################################################
+vess_cpue<-tapply(unique_vessels$cpue,list(unique_vessels$FYEAR,unique_vessels$vessel_length),mean,na.rm=T)
+vess_cpue_sd<-tapply(unique_vessels$cpue,list(unique_vessels$FYEAR,unique_vessels$vessel_length),sd,na.rm=T)
+
+cpue_2000<-vess_cpue[rownames(vess_cpue)=="2000",]
+plot(cpue_2000[-37]~names(cpue_2000)[-37],xlab="Vessel Length", ylab="Mean cpue", main ="2000")
+ 
+
+
+cpue_2010<-vess_cpue[rownames(vess_cpue)=="2010",]
+plot(cpue_2010[-37]~names(cpue_2010)[-37],xlab="Vessel Length", ylab="Mean cpue", main = "2010")
+
+
+cpue_2015<-vess_cpue[rownames(vess_cpue)=="2015",]
+plot(cpue_2015[-37]~names(cpue_2015)[-37],xlab="Vessel Length", ylab="Mean cpue", main ="2015")
+
+cpue_2018<-vess_cpue[rownames(vess_cpue)=="2018",]
+plot(cpue_2018[-37]~names(cpue_2018)[-37],xlab="Vessel Length", ylab="Mean cpue", main = "2018")
+
+
+
+    
+#######################################################################################################################################################
+#now look at number of registered vessels fishing each year#############################################################################################
+
+vessel_dat3<-vessel_dat[,c("HA_NO","FYEAR", "vessel_name", "vessel_length", "vessel_manufacturer")] #,"dayeffort","houreffort")]
+
+#dim(vessel_dat3) # 222185      7
+
+unique_vessels<-unique(vessel_dat3)
+#dim(unique_vessels) #because of multiple trips with different units of effort, unique does not give a count of vessels....works for trip analysis though
+
+valid<-function(x){return(length(!is.na(x)))}
+vess_num<-tapply(unique_vessels$vessel_length,unique_vessels$FYEAR,valid)
+plot(vess_num~c(1988,1989,1992,1994:2018), xlab="Year",ylab="Number",main= "Number of registered vessels fishing") #why clustering in 1990s?
+
+
+
+
+```
+
+There may be some relationship between vessel length and cpue, but this may be subsumed by already including fisher in the standardization method.
