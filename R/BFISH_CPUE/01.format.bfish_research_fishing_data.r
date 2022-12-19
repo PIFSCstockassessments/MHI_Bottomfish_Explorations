@@ -74,7 +74,7 @@
 			  .[,SAMPLE_DATE:=as.POSIXct(SAMPLE_DATE,tz="HST",format=c("%Y-%m-%d"))] %>%
 			  .[,YEAR:=format(SAMPLE_DATE,format="%Y")] %>%
 			  .[,MONTH:=format(SAMPLE_DATE,format="%m")] %>%
-			  .[,DAY:=format(SAMPLE_DATE,format="%m")] %>%
+			  .[,DAY:=format(SAMPLE_DATE,format="%d")] %>%
 			  .[,JD:=as.numeric(format(SAMPLE_DATE,format="%j"))] %>%
 			  .[,YEAR_continuous:=as.numeric(YEAR)+(JD-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction]
