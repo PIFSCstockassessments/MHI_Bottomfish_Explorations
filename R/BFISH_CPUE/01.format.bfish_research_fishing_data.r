@@ -108,10 +108,12 @@
 			  # .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"] # %>%
 			  # .[,SPECIES_GRP:="Deep7"] %>%
 			  # .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP"), SPECIES_GRP:="Other"]
-	samples_missing_bait = unique(BFISH_C[is.na(BAIT_CD)]$SAMPLE_ID)
+	samples_correct_bait = unique(BFISH_C[BAIT_CD %in% c("F","S")]$SAMPLE_ID)
 	# exclude samples where bait was missing for recorded fish
 	BFISH_C_long = copy(BFISH_C)
-	BFISH_C = BFISH_C %>% .[!(SAMPLE_ID %in% c(samples_missing_bait))] %>%
+	BFISH_C = BFISH_C %>% 
+			   # retain samples with correct recording of bait
+			  .[SAMPLE_ID %in% c(samples_correct_bait)] %>%
 			   # exclude samples where lengths are missing
 			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
