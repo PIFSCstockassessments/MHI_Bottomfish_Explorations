@@ -160,6 +160,20 @@
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction] %>%
 			  .[,.(DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]
 	
+	# recalculate PSU based on actual location of drop
+	close_psu_vec = rep(NA,nrow(BFISH_CAM_S))
+	for(i in seq_along(close_psu_vec))
+	{
+		tmp_lon = BFISH_CAM_S$OBS_LON[i]
+		tmp_lat = BFISH_CAM_S$OBS_LAT[i]
+
+		tmp_dist = geosphere::distHaversine(c(tmp_lon,tmp_lat),as.matrix(PSU_table[,.(lon_deg,lat_deg)]))
+		close_psu_vec[i] = PSU_table$PSU[which(tmp_dist==min(tmp_dist))]
+		rm(list=c("tmp_lon","tmp_lat","tmp_dist"))
+	}
+	mean(BFISH_CAM_S$PSU == close_psu_vec)
+	BFISH_CAM_S$PSU = close_psu_vec
+
 	camera_dt = merge(BFISH_CAM_S,BFISH_CAM_C,by=c("DROP_CD"),all=TRUE) %>%
 						  # this next line drops samples with bad PSUs
 						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
