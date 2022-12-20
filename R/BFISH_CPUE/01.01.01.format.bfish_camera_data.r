@@ -193,7 +193,11 @@
 						  # drop samples with missing values
 						  na.omit(.) %>%
 						  .[!(DROP_CD %in% dark_drops)] %>%
-						  .[!(DROP_CD %in% missing_lengths)]
+						  .[!(DROP_CD %in% missing_lengths)] %>%
+						  # define sampling_unit variable
+						  .[,SEASON:=ifelse(as.numeric(MONTH)>6,"Fall","Spring")] %>%
+						  .[,design_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)] %>%
+						  .[,model_sampling_unit:=DROP_CD]
 
 	# save formatted data
 		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_S.RData"))
