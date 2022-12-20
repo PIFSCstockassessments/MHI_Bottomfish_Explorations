@@ -3,6 +3,8 @@
 # Nicholas Ducharme-Barth
 # 04/04/2022
 # Format BFISH camera data
+# The sampling_unit is defined as each individual drop
+# Drops are excluded if they are "dark" or if they have missing length measurements
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -108,16 +110,14 @@
 	dark_drops = fread(paste0(proj.dir,"Data/",data_flag,"CAM_MAXN.csv"))[SPECIES_CD == "DARK"]$DROP_CD
 	BFISH_CAM_COUNT = fread(paste0(proj.dir,"Data/",data_flag,"CAM_MAXN.csv")) %>%
 			  .[,.(MAXN=sum(MAXN)),by=.(DROP_CD,SPECIES_CD)] %>%
-			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
-			  .[!(DROP_CD %in% dark_drops)]
+			  .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")]
 	BFISH_CAM_LENGTHS = fread(paste0(proj.dir,"Data/",data_flag,"CAM_LENGTHS.csv")) %>%
 			      .[,LENGTH_CM:=round(MEAN_MM/10)] %>%
 				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
 				  .[,.N,by=.(DROP_CD,SPECIES_CD,LENGTH_CM)] %>%
 				  .[,TOTAL_N:=sum(N),by=.(DROP_CD,SPECIES_CD)] %>%
 				  .[,PROP_N:=N/TOTAL_N] %>%
-				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM,PROP_N)] %>%
-				  .[!(DROP_CD %in% dark_drops)]
+				  .[,.(DROP_CD,SPECIES_CD,LENGTH_CM,PROP_N)]
 
 	BFISH_CAM_C = merge(BFISH_CAM_LENGTHS,BFISH_CAM_COUNT,by=c("DROP_CD","SPECIES_CD"),all.x=TRUE,all.y=TRUE) %>%
 			  	  merge(.,species_dt[,.(SPECIES_CD,A,B,GCF)],by="SPECIES_CD") %>%
@@ -140,7 +140,7 @@
 			  .[,.(DROP_CD,SPECIES_CD,N,KG,STD_N,STD_KG)]
 
 	BFISH_CAM_C_long = copy(BFISH_CAM_C)
-	BFISH_CAM_C = BFISH_CAM_C %>% .[!(DROP_CD %in% c(missing_lengths))] %>%
+	BFISH_CAM_C = BFISH_CAM_C %>% 
 			  .[,.(DROP_CD,SPECIES_CD,KG)] %>%
 			  # keep only biomass measurement
 			  dcast(.,DROP_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
@@ -158,10 +158,8 @@
 			  .[,JD:=as.numeric(format(SAMPLE_DATE,format="%j"))] %>%
 			  .[,YEAR_continuous:=as.numeric(YEAR)+(JD-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction] %>%
-			  .[,.(DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]  %>%
-			  .[!(DROP_CD %in% dark_drops)] %>%
-			  .[!(DROP_CD %in% c(missing_lengths))]
-
+			  .[,.(DROP_CD,SAMPLE_DATE,YEAR,MONTH,DAY,JD,YEAR_continuous,LUNAR_PHASE,DROP_TIME_HST,VESSEL,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)]
+	
 	camera_dt = merge(BFISH_CAM_S,BFISH_CAM_C,by=c("DROP_CD"),all=TRUE) %>%
 						  # this next line drops samples with bad PSUs
 						  merge(.,PSU_table[,.(PSU,Island,STRATA,STRATA_2020,Depth_MEDIAN_m,substrate,slope,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="PSU") %>%
@@ -179,9 +177,11 @@
 						  .[is.na(PRSI),PRSI:=0] %>%
 						  .[is.na(PRZO),PRZO:=0] %>%
 						  # drop samples with missing values
-						  na.omit(.)
+						  na.omit(.) %>%
+						  .[!(DROP_CD %in% dark_drops)] %>%
+						  .[!(DROP_CD %in% missing_lengths)]
 
 	# save formatted data
-		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"BFISH_CAM_S.RData"))
-		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/",data_flag,"BFISH_CAM_C.RData"))
-		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"camera_dt.RData"))
+		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_S.RData"))
+		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_C.RData"))
+		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"01.camera_dt.RData"))
