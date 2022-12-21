@@ -79,6 +79,30 @@
 			  .[,YEAR_continuous:=as.numeric(YEAR)+(JD-1)/366] %>%
 			  .[,LUNAR_PHASE:=getMoonIllumination(format(SAMPLE_DATE, format="%Y-%m-%d"))$fraction]
 
+	# PSU specific information
+	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
+				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
+				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
+				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
+
+	# recalculate PSU based on actual location of drop
+	tmp_dt = merge(BFISH_S[,.(BFISH,SAMPLE_ID,PSU)],BFISH_D[,.(BFISH,SAMPLE_ID,LON,LAT)],by=c("BFISH","SAMPLE_ID"))
+	close_psu_vec = rep(NA,nrow(tmp_dt))
+	for(i in seq_along(close_psu_vec))
+	{
+		tmp_lon = tmp_dt$LON[i]
+		tmp_lat = tmp_dt$LAT[i]
+
+		tmp_dist = geosphere::distHaversine(c(tmp_lon,tmp_lat),as.matrix(PSU_table[,.(lon_deg,lat_deg)]))
+		close_psu_vec[i] = PSU_table$PSU[which(tmp_dist==min(tmp_dist))]
+		rm(list=c("tmp_lon","tmp_lat","tmp_dist"))
+	}
+	mean(tmp_dt$PSU == close_psu_vec)
+	tmp_dt$PSU = close_psu_vec
+	BFISH_S = BFISH_S %>%
+			  .[,PSU:=NULL] %>%
+			  merge(.,tmp_dt[,.(BFISH,SAMPLE_ID,PSU)],by=c("BFISH","SAMPLE_ID"))
+
 	# bring in conversion factor data
 	species_dt = fread(paste0(proj.dir,"Data/SPECIES_TABLE.csv")) %>%
 				 .[SPECIES_CD %in% c("ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU")] %>%
@@ -120,13 +144,6 @@
 			  # keep only biomass measurement
 			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
-	
-	# PSU specific information
-	PSU_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
-				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
-				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
-				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])]
-
 
 	research_fishing_dt = merge(BFISH_S,BFISH_D,by=c("BFISH","SAMPLE_ID")) %>%
 						  # this next line drops samples with bad PSUs
