@@ -136,10 +136,6 @@
 	# exclude samples where bait was missing for recorded fish
 	BFISH_C_long = copy(BFISH_C)
 	BFISH_C = BFISH_C %>% 
-			   # retain samples with correct recording of bait
-			  .[SAMPLE_ID %in% c(samples_correct_bait)] %>%
-			   # exclude samples where lengths are missing
-			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
 			  # keep only biomass measurement
 			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
@@ -195,7 +191,12 @@
 						  .[is.na(PRSI),PRSI:=0] %>%
 						  .[is.na(PRZO),PRZO:=0] %>%
 						  # drop samples with missing values
-						  na.omit(.)
+						  na.omit(.) %>%
+						  # retain samples with correct recording of bait
+			  			  .[SAMPLE_ID %in% c(samples_correct_bait)] %>%
+			   			  # exclude samples where lengths are missing
+			  			  .[!(SAMPLE_ID %in% c(missing_lengths))]
+
 
 						
 	
