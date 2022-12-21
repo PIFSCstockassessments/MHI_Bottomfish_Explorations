@@ -123,7 +123,7 @@
 			  .[LENGTH_CM>=29,Length_category:="Exploitable"] %>%
 			  .[LENGTH_CM<29,Length_category:="Un-exploitable"] %>%
 			  .[is.na(LENGTH_CM),Length_category:="Unknown"] %>%
-			  .[,.(N=sum(N),STD_N=sum(N),KG=sum(KG),STD_KG=sum(STD_KG)),by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,Length_category)]
+			  .[,.(N=sum(N),STD_N=sum(STD_N),KG=sum(KG),STD_KG=sum(STD_KG)),by=.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,Length_category)]
 	missing_lengths = unique(BFISH_C[Length_category=="Unknown"]$SAMPLE_ID)
 	BFISH_C = BFISH_C %>%
 			  # keep only exploitable "sized" biomass
@@ -132,14 +132,13 @@
 			  # .[SPECIES_CD=="SQSP",SPECIES_CD:="SQMI"] # %>%
 			  # .[,SPECIES_GRP:="Deep7"] %>%
 			  # .[SPECIES_CD %in% c("APVI","SEDU","SQMI","SQSP"), SPECIES_GRP:="Other"]
-	samples_correct_bait = unique(BFISH_C[BAIT_CD %in% c("F","S")]$SAMPLE_ID)
-	# exclude samples where bait was missing for recorded fish
-	BFISH_C_long = copy(BFISH_C)
 	BFISH_C = BFISH_C %>% 
 			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,SPECIES_CD,KG)] %>%
 			  # keep only biomass measurement
 			  dcast(.,BFISH+SAMPLE_ID+BAIT_CD~SPECIES_CD,value.var="KG",fill=0,fun.aggregate=sum) %>%
-			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)]
+			  .[,.(BFISH,SAMPLE_ID,BAIT_CD,ETCO,ETCA,PRSI,PRFI,PRZO,HYQU,APRU)] %>%
+			  # collapse across bait categories
+			  .[,.(ETCO=sum(ETCO),ETCA=sum(ETCA),PRSI=sum(PRSI),PRFI=sum(PRFI),PRZO=sum(PRZO),HYQU=sum(HYQU),APRU=sum(APRU)),by=.(BFISH,SAMPLE_ID)]
 
 	research_fishing_dt = merge(BFISH_S,BFISH_D,by=c("BFISH","SAMPLE_ID")) %>%
 						  # this next line drops samples with bad PSUs
@@ -174,11 +173,7 @@
 						  # .[depth_strata_2020=="D4"&complexity%in%c("MA3")&hardness%in%c("HB3"),STRATA_2020:="S22"] %>%
 						  # .[depth_strata_2020=="D5"&complexity%in%c("MA1","MA2")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S23"] %>%
 						  # .[depth_strata_2020=="D5"&complexity%in%c("MA3")&hardness%in%c("HB1","HB2","HB3"),STRATA_2020:="S24"] %>%
-						  .[,BAIT_CD:="S"]
-	tmp_dt = copy(research_fishing_dt)
-	tmp_dt$BAIT_CD = "F"
-	research_fishing_dt = rbind(research_fishing_dt,tmp_dt) %>%
-						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID","BAIT_CD"),all=TRUE) %>%
+						  merge(.,BFISH_C,by=c("BFISH","SAMPLE_ID"),all=TRUE) %>%
 						  # this next line drops samples with missing PSUs
 						  .[!is.na(PSU)] %>%
 						  # drops PSUs outside of EFH 75-400m
@@ -192,8 +187,6 @@
 						  .[is.na(PRZO),PRZO:=0] %>%
 						  # drop samples with missing values
 						  na.omit(.) %>%
-						  # retain samples with correct recording of bait
-			  			  .[SAMPLE_ID %in% c(samples_correct_bait)] %>%
 			   			  # exclude samples where lengths are missing
 			  			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 						  # define sampling_unit variable
