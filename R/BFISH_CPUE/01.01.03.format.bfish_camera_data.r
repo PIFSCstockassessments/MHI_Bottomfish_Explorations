@@ -2,10 +2,10 @@
 
 # Nicholas Ducharme-Barth
 # 12/20/2022
-# Format BFISH camera data: Option 2
+# Format BFISH camera data: Option 3
 # The sampling_unit is defined as two camera drops within a PSU during the same sampling season
-# Drops are excluded if they are "dark" or if they have missing length measurements
-# After exclusion of drops then values are averaged within sampling unit (PSU). 
+# Sampling units are excluded if they contain drops that are "dark" or if they have missing length measurements
+# Values are averaged within sampling unit (PSU). 
 # Note: The number of camera drops within sampling unit may not be equal to 2...
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -55,12 +55,18 @@
 						  .[is.na(PRZO),PRZO:=0] %>%
 						  # drop samples with missing values
 						  na.omit(.) %>%
-						  .[!(DROP_CD %in% dark_drops)] %>%
-						  .[!(DROP_CD %in% missing_lengths)] %>%
 						  # define sampling_unit variable
 						  .[,SEASON:=ifelse(as.numeric(MONTH)>6,"Fall","Spring")] %>%
 						  .[,design_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)] %>%
 						  .[,model_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)]
+    
+    # remove sampling units that were dark or impacted by missing length measurements
+    bad_sampling_units = camera_dt[,.(model_sampling_unit,DROP_CD)] %>%
+                         .[(DROP_CD %in% dark_drops) | (DROP_CD %in% missing_lengths)]
+
+    camera_dt = camera_dt %>% .[!(model_sampling_unit %in% bad_sampling_units$model_sampling_unit)]
+
+    	                    
 
     # combine secondary sampling units (DROP_CD) within each primary sampling unit (model_sampling_unit)
     mode = function(x)
@@ -83,4 +89,4 @@
 
 
 	# save formatted data
-		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"02.camera_dt.RData"))
+		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"03.camera_dt.RData"))
