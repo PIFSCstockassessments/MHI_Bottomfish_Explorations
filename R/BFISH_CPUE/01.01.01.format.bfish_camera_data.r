@@ -202,4 +202,6 @@
 	# save formatted data
 		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_S.RData"))
 		save(BFISH_CAM_C,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_C.RData"))
+		save(dark_drops,file=paste0(proj.dir,"Data/",data_flag,"01.camera.dark_drops.RData"))
+		save(missing_lengths,file=paste0(proj.dir,"Data/",data_flag,"01.camera.missing_lengths.RData"))
 		save(camera_dt,file=paste0(proj.dir,"Data/",data_flag,"01.camera_dt.RData"))

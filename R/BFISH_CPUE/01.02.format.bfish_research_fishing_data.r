@@ -195,7 +195,7 @@
 						  # retain samples with correct recording of bait
 			  			  .[SAMPLE_ID %in% c(samples_correct_bait)] %>%
 			   			  # exclude samples where lengths are missing
-			  			  .[!(SAMPLE_ID %in% c(missing_lengths))]
+			  			  .[!(SAMPLE_ID %in% c(missing_lengths))] %>%
 						  # define sampling_unit variable
 						  .[,SEASON:=ifelse(as.numeric(MONTH)>6,"Fall","Spring")] %>%
 						  .[,design_sampling_unit:=SAMPLE_ID] %>%
