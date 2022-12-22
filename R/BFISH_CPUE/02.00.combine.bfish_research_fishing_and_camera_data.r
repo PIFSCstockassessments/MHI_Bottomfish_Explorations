@@ -2,7 +2,15 @@
 
 # Nicholas Ducharme-Barth
 # 04/14/2022
-# Combine research_fishing_dt and camera_dt data sets into a single analysis ready data set
+# Combine research_fishing_dt and camera_dt data sets into a combined analysis ready data set
+# define common columns
+# id: model_sampling_unit, design_sampling_unit
+# strata: psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness
+# temporal: date, year, season, month, jd, year_continuous
+# spatial: lon, lat
+# covar: depth, time, lunar_phase
+# q_covar: gear_type, platform, obs_wind, obs_wave, obs_current
+# catch: etco, etca, prsi, prfi, przo, hyqu, apru
 # Copyright (c) 2022 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
@@ -19,44 +27,8 @@
 	# data_flag = "" # only loads data up through 2020
 	data_flag = "2021_" # includes data through 2021
 #_____________________________________________________________________________________________________________________________
-# bring in data
-	load(file=paste0(proj.dir,"Data/",data_flag,"camera_dt.RData"))
+# bring research fishing data
 	load(file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.RData"))
-
-#_____________________________________________________________________________________________________________________________
-# define common columns
-# id: sample_id
-# strata: psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness
-# temporal: date, year, season, month, jd, year_continuous
-# spatial: lon, lat
-# covar: depth, time, lunar_phase
-# q_covar: gear_type, platform, bait_type
-# catch: etco, etca, prsi, prfi, przo, hyqu, apru
-
-#_____________________________________________________________________________________________________________________________
-# format camera_dt to have common columns
-	common_camera_dt = camera_dt %>% 
-					   .[,gear_type:="camera"] %>%
-					   .[,bait_type:="C"] %>%
-					   .[,season:="fall"] %>%
-					   .[MONTH %in% c("02","03"),season:="spring"] %>% 
-					   # rename variables
-					   setnames(.,c("DROP_CD",
-					   				"PSU","Island","STRATA","STRATA_2020","substrate","slope","depth_strata","depth_strata_2020","complexity","hardness",
-					   				"SAMPLE_DATE","YEAR","season","MONTH","JD","YEAR_continuous",
-					   				"OBS_LON","OBS_LAT",
-					   				"OFFICIAL_DEPTH_M","DROP_TIME_HST","LUNAR_PHASE",
-					   				"gear_type", "VESSEL", "bait_type",
-					   				"ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU"),
-					   				c("sample_id",
-					   				  "psu", "island", "strata", "strata_2020", "substrate", "slope", "depth_strata", "depth_strata_2020", "complexity", "hardness",
-					   				  "date", "year","season", "month", "jd", "year_continuous",
-					   				  "lon", "lat",
-					   				  "depth", "time", "lunar_phase",
-					   				  "gear_type", "platform", "bait_type",
-					   				  "etco", "etca", "prsi", "prfi", "przo", "hyqu", "apru")) %>%
-					   # select proper columns
-					   .[,.(sample_id,psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness,date, year, season, month, jd, year_continuous,lon, lat,depth, time, lunar_phase,gear_type, platform, bait_type,etco, etca, prsi, prfi, przo, hyqu, apru)]
 
 #_____________________________________________________________________________________________________________________________
 # format research_fishing_dt to have common columns
@@ -72,35 +44,91 @@
 					   				"SAMPLE_DATE","YEAR","season","MONTH","JD","YEAR_continuous",
 					   				"LON","LAT",
 					   				"DEPTH_M","TIME_MIN","LUNAR_PHASE",
-					   				"gear_type", "VESSEL", "BAIT_CD",
+					   				"gear_type", "VESSEL","WIND_SPEED_KT", "WAVE_HEIGHT_FT", "CURRENT_CD",
 					   				"ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU"),
 					   				c("sample_id",
 					   				  "psu", "island", "strata", "strata_2020", "substrate", "slope", "depth_strata", "depth_strata_2020", "complexity", "hardness",
 					   				  "date", "year","season", "month", "jd", "year_continuous",
 					   				  "lon", "lat",
 					   				  "depth", "time", "lunar_phase",
-					   				  "gear_type", "platform", "bait_type",
+					   				  "gear_type", "platform", "obs_wind", "obs_wave", "obs_current",
 					   				  "etco", "etca", "prsi", "prfi", "przo", "hyqu", "apru")) %>%
 					   # select proper columns
-					   .[,.(sample_id,psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness,date, year, season, month, jd, year_continuous,lon, lat,depth, time, lunar_phase,gear_type, platform, bait_type,etco, etca, prsi, prfi, przo, hyqu, apru)]
-
-#_____________________________________________________________________________________________________________________________
-# combine
-	bfish_combined_wide_dt = rbind(common_camera_dt,common_research_fishing_dt) %>%
-							 .[order(year_continuous,gear_type,psu)]
-
-	bfish_combined_long_dt = bfish_combined_wide_dt %>%
-							 melt(.,id.vars=c("sample_id",
-					   				  "psu", "island", "strata", "strata_2020", "substrate", "slope", "depth_strata", "depth_strata_2020", "complexity", "hardness",
-					   				  "date", "year", "season", "month", "jd", "year_continuous",
-					   				  "lon", "lat",
-					   				  "depth", "time", "lunar_phase",
-					   				  "gear_type", "platform", "bait_type")) %>%
-							 setnames(.,c("variable","value"),c("species_cd","weight_kg"))
-#_____________________________________________________________________________________________________________________________
-# save formatted data
-	save(common_camera_dt,file=paste0(proj.dir,"Data/",data_flag,"common_camera_dt.RData"))
+					   .[,.(model_sampling_unit, design_sampling_unit,psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness,date, year, season, month, jd, year_continuous,lon, lat,depth, time, lunar_phase,gear_type, platform, obs_wind, obs_wave, obs_current, etco, etca, prsi, prfi, przo, hyqu, apru)]
+	# save
 	save(common_research_fishing_dt,file=paste0(proj.dir,"Data/",data_flag,"common_research_fishing_dt.RData"))
-	save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_wide_dt.RData"))
-	save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/",data_flag,"bfish_combined_long_dt.RData"))
+
+
+#_____________________________________________________________________________________________________________________________
+# loop over 5 different camera data options, format, combine, and save
+	combined_dt.list = as.list(rep(NA,5))
+
+	for(i in 1:5)
+	{
+		# load data
+		load(file=paste0(proj.dir,"Data/",data_flag,"0",i,".camera_dt.RData"))
+		# format camera_dt to have common columns
+		common_camera_dt = camera_dt %>% 
+						.[,gear_type:="camera"] %>%
+						.[,season:="fall"] %>%
+						.[MONTH %in% c("02","03"),season:="spring"] %>%
+						.[,obs_wind:=NA] %>%
+						.[,obs_wave:=NA] %>%
+						.[,obs_current:=NA] %>% 
+						# rename variables
+						setnames(.,c(	"PSU","Island","STRATA","STRATA_2020","substrate","slope","depth_strata","depth_strata_2020","complexity","hardness",
+										"SAMPLE_DATE","YEAR","season","MONTH","JD","YEAR_continuous",
+										"OBS_LON","OBS_LAT",
+										"OFFICIAL_DEPTH_M","DROP_TIME_HST","LUNAR_PHASE",
+										"gear_type", "VESSEL",
+										"ETCO","ETCA","PRSI","PRFI","PRZO","HYQU","APRU"),
+										c("psu", "island", "strata", "strata_2020", "substrate", "slope", "depth_strata", "depth_strata_2020", "complexity", "hardness",
+										"date", "year","season", "month", "jd", "year_continuous",
+										"lon", "lat",
+										"depth", "time", "lunar_phase",
+										"gear_type", "platform",
+										"etco", "etca", "prsi", "prfi", "przo", "hyqu", "apru")) %>%
+						# select proper columns
+					   .[,.(model_sampling_unit, design_sampling_unit,psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness,date, year, season, month, jd, year_continuous,lon, lat,depth, time, lunar_phase,gear_type, platform, obs_wind, obs_wave, obs_current, etco, etca, prsi, prfi, przo, hyqu, apru)]
+		# combine
+		if(i>1)
+		{
+			# match class due to aggregation
+			common_research_fishing_dt$date = as.character(common_research_fishing_dt$date)
+		}
+		combined_dt.list[[i]] = bfish_combined_wide_dt = rbind(common_camera_dt,common_research_fishing_dt) %>%
+								.[order(year_continuous,gear_type,psu)]
+
+		bfish_combined_long_dt = bfish_combined_wide_dt %>%
+								melt(.,id.vars=c("model_sampling_unit", "design_sampling_unit",
+										"psu", "island", "strata", "strata_2020", "substrate", "slope", "depth_strata", "depth_strata_2020", "complexity", "hardness",
+										"date", "year", "season", "month", "jd", "year_continuous",
+										"lon", "lat",
+										"depth", "time", "lunar_phase",
+										"gear_type", "platform", "obs_wind", "obs_wave", "obs_current")) %>%
+								setnames(.,c("variable","value"),c("species_cd","weight_kg"))
+		
+		# save formatted data
+		save(common_camera_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".common_camera_dt.RData"))
+		save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_wide_dt.RData"))
+		save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_long_dt.RData"))
+
+		# clean-up
+		rm(list=c("camera_dt","common_camera_dt","bfish_combined_wide_dt","bfish_combined_long_dt"))
+	}
+	
+	# version 01 of the combined data contains all unique model_sampling_units & design_sampling_units
+	# version 02 of the combined data contains all unique design_sampling_units
+		# t = lapply(combined_dt.list,function(x)unique(x$design_sampling_unit))
+		# mean(t[[1]] %in% t[[2]])
+		# mean(t[[3]] %in% t[[2]])
+		# mean(t[[4]] %in% t[[2]])
+		# mean(t[[5]] %in% t[[2]])
+
+		# sapply(combined_dt.list,nrow)
+
+
+
+
+
 
