@@ -119,6 +119,7 @@
 	
 	# version 01 of the combined data contains all unique model_sampling_units & design_sampling_units
 	# version 02 of the combined data contains all unique design_sampling_units
+	# Note that in versions 02 -- 05, model_sampling_unit == design_sampling_unit
 	# t = lapply(combined_dt.list,function(x)unique(x$design_sampling_unit))
 	# mean(t[[1]] %in% t[[2]])
 	# [1] 1
