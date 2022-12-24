@@ -26,7 +26,7 @@
     data_treatment = "05"
     catchability_covariates = "v" # vanilla
     abundance_covariates = "v" # vanilla
-    lehi_filter = FALSE
+    lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
     fine_scale = FALSE
     bias_correct = TRUE
@@ -228,7 +228,7 @@
 			geom_abline(slope=1,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
 			geom_abline(slope=2,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
 			geom_abline(slope=3,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
-			geom_abline(slope=meanvar_lm$coefficients[2],intercept=meanvar_lm$coefficients[1],linetype="dashed",color="black",size=2) +			
+			geom_abline(slope=meanvar_lm$coefficients[2],intercept=meanvar_lm$coefficients[1],linetype="dashed",color="black",linewidth=2) +			
 			geom_point(aes(x=mean,y=var,fill=species_cd,size=N),shape=21) +
 			theme_few(base_size=20) +
 			geom_text(data=text_dt,aes(x=x,y=y,label=label),size=7) +
@@ -782,7 +782,7 @@
 			facet_wrap(~Category,scales="free") +
 			geom_hline(yintercept=0) +
 			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Category),alpha=0.25) +
-			geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),size=1.5) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),linewidth=1.5) +
 			viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
 			viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
 			theme_few(base_size=20)
@@ -808,8 +808,8 @@
 			geom_hline(yintercept=0) +
 			geom_hline(yintercept=1,linetype="dashed") +
 			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Category),alpha=0.25) +
-			geom_path(data=nominal_dt,aes(x=Time,y=Estimate),size=1.5,color="black",linetype="dotted") +
-			geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),size=1.5) +
+			geom_path(data=nominal_dt,aes(x=Time,y=Estimate),linewidth=1.5,color="black",linetype="dotted") +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Category),linewidth=1.5) +
 			viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
 			viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
 			theme_few(base_size=20)
@@ -851,10 +851,9 @@
 			xlab("Year") +
 			facet_grid(component~species) +
 			geom_hline(yintercept=1,linetype="dashed") +
-			geom_line(aes(x=year,y=influ,group=variable,color=variable),size=1.5) +
+			geom_line(aes(x=year,y=influ,group=variable,color=variable),linewidth=1.5) +
 			viridis::scale_color_viridis("Variable",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
 			theme_few(base_size=20)
 			ggsave(filename=paste0("influ_by_species.png"), plot = p, device = "png", path = working_dir,
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)
-						
