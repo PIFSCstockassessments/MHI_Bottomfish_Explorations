@@ -21,6 +21,7 @@
 	# ggthemes functions sourced directly
 #_____________________________________________________________________________________________________________________________
 # specify (coarse) model configuration
+	data_flag = 2021
     link_function = "pldg" # poisson-link delta-gamma
     species = "prfi"
     data_treatment = "05"
@@ -31,8 +32,10 @@
     fine_scale = FALSE
     bias_correct = TRUE
 	residual_type = "pit" # other option is one step ahead (osa) which is sloooooow (~30 minutes)
+	xval = "xval" # "no_xval" # warning xval also appears to be quite slow... (~30 minutes)
 
-    model_name = paste(link_function,
+    model_name = paste(data_flag,
+				link_function,
                 species,data_treatment,
                 catchability_covariates,
                 abundance_covariates,
@@ -41,6 +44,7 @@
                 fine_scale,
                 bias_correct,
 				residual_type,
+				xval,
                 sep="_")
 
 #_____________________________________________________________________________________________________________________________
@@ -49,13 +53,12 @@
 	working_dir = paste0(proj.dir,"VAST/model_runs/",as.character(format(Sys.time(),format="%Y-%m-%d")),"/",model_name,"/")
 	dir.create(working_dir,recursive=TRUE)
 
-#_____________________________________________________________________________________________________________________________
-# define data_flag
-	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	# xval path
+    load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
+
 #_____________________________________________________________________________________________________________________________
 # 1) bring in data
-	load(file=paste0(proj.dir,"Data/",data_flag,data_treatment,".bfish_combined_long_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"_",data_treatment,".bfish_combined_long_dt.RData"))
 
 	# subset to species
     if(species == "mv")
@@ -67,7 +70,7 @@
 	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% species] %>% as.data.frame(.)
 	
 	# remove sample with large lehi observation
-    if(species %in% c("mv","apru") & lehi_filter)
+    if(lehi_filter)
     {
         bfish_df =  subset(bfish_df,design_sampling_unit!="2021_Fall_32293")
     }
@@ -857,3 +860,117 @@
 			ggsave(filename=paste0("influ_by_species.png"), plot = p, device = "png", path = working_dir,
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)
+
+#_____________________________________________________________________________________________________________________________
+# 6) cross-validation
+
+	A = proc.time()
+	if(xval == "xval")
+	{
+		k_folds = length(list.files(load_xval_path))/4
+		valid_vec = rep(NA,k_folds)
+		xval_dt.list = as.list(rep(NA,k_folds))
+
+		for(k in 1:k_folds)
+		{
+			load(file=paste0(load_xval_path,k,"_xval_extrapolation_list.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_spatial_list.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_train_df.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_test_df.RData"))
+
+			if(target_species != "mv")
+			{
+				tmp_weight_kg = xval_train_df[,target_species]
+				xval_train_df$weight_kg = tmp_weight_kg
+				xval_train_df$species_cd = target_species
+				rm(list="tmp_weight_kg")
+			}
+			
+			xval_working_dir = paste0(working_dir,"xval/",k,"/")
+			dir.create(xval_working_dir,recursive = TRUE)
+
+			xval_fit = fit_model( settings=settings,
+ 				   				Lon_i=xval_train_df$lon,
+    			   				Lat_i=xval_train_df$lat,
+          						t_i=as.integer(xval_train_df$year),
+          						b_i=xval_train_df$weight_kg,
+          						a_i=rep(pi * (0.02760333457^2),nrow(xval_train_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
+	    	  					c_i = as.numeric(factor(xval_train_df[,'species_cd'],levels=c(target_species)))-1,
+	    	  					category_names=c(target_species),
+	    	  					covariate_data = NULL,
+	    	  					catchability_data = NULL,
+          						working_dir = xval_working_dir,
+          						newtonsteps = 1,
+          						# extrapolation list args
+          						extrapolation_list = xval_extrapolation_list,
+          						# spatial list args
+    	  						spatial_list = xval_spatial_list,
+    	  						test_fit=TRUE)
+			
+			if("xval_fit" %in% ls())
+			{
+				valid_vec[k] = k
+
+				if(target_species != "mv")
+				{
+					tmp_weight_kg = xval_test_df[,target_species]
+					xval_test_df$weight_kg = tmp_weight_kg
+					xval_test_df$species_cd = target_species
+					rm(list="tmp_weight_kg")
+				}
+
+				xval_predict_working_dir = paste0(working_dir,"xval/",k,"/predict/")
+				dir.create(xval_predict_working_dir,recursive = TRUE)
+
+				xval_fit$input_args$spatial_args_input = list(
+														n_x=xval_spatial_list$n_x,
+														Lon_i=xval_test_df$lon,
+														Lat_i=xval_test_df$lat,
+														Extrapolation_List=xval_extrapolation_list,
+														Method = "Barrier",
+														anisotropic_mesh = xval_spatial_list$MeshList$anisotropic_mesh,
+														grid_size_km = 0.5,
+														grid_size_LL = 0.5/110,
+														fine_scale = xval_spatial_list$fine_scale,
+														Save_Results = FALSE,
+														LON_intensity=xval_spatial_list$latlon_x[,"Lon"],
+														LAT_intensity=xval_spatial_list$latlon_x[,"Lat"],
+														map_data=hi_coast
+    	  												)
+
+				xval_predict = predict(xval_fit,
+                  what="D_i",
+                  Lat_i=xval_test_df$lat,
+                  Lon_i=xval_test_df$lon,
+                  t_i=as.integer(xval_test_df$year),
+                  a_i=rep(pi * (0.02760333457^2),nrow(xval_test_df)),
+                  c_iz = as.numeric(factor(xval_test_df[,'species_cd'],levels=c(target_species)))-1,
+                  do_checks = TRUE,
+                  working_dir = xval_predict_working_dir )
+
+				  xval_test_df$pred_weight_kg = xval_predict
+				  xval_test_df$partition = k
+
+				  xval_dt.list[[k]] = as.data.table(xval_test_df) %>%
+				  					  .[,.(partition,model_sampling_unit,year,lon,lat,species_cd,weight_kg,pred_weight_kg)]
+
+
+				  rm(list=c("xval_predict_working_dir","xval_predict"))
+				  gc();
+
+			}
+
+			# clean-up
+        	rm(list=c("xval_fit","xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
+			gc();
+		}
+
+		xval_dt = rbindlist(xval_dt.list[na.omit(valid_vec)])
+		xval_rmse_dt = copy(xval_dt) %>%
+					   .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)),nrmse=sqrt(mean((weight_kg-pred_weight_kg)^2))/sd(weight_kg),.N),by=.(partition)]
+		fwrite(xval_dt,file=paste0(working_dir,"xval_dt.csv"))
+		fwrite(xval_rmse_dt,file=paste0(working_dir,"xval_rmse_dt.csv"))
+
+	}
+	B = proc.time()
+	B-A
