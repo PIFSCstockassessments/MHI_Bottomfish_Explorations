@@ -34,6 +34,9 @@
 	residual_type = "pit" # other option is one step ahead (osa) which is sloooooow (~30 minutes)
 	xval = "xval" # "no_xval" # warning xval also appears to be quite slow... (~30 minutes)
 
+    # can bring in spatial data from an existing model if spatial structure of data is identical
+    load_spatial = FALSE
+    
     model_name = paste(data_flag,
 				link_function,
                 species,data_treatment,
@@ -53,6 +56,7 @@
 	working_dir = paste0(proj.dir,"VAST/model_runs/",as.character(format(Sys.time(),format="%Y-%m-%d")),"/",model_name,"/")
 	dir.create(working_dir,recursive=TRUE)
 
+    load_spatial_path = NULL
 	# xval path
     load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
 
@@ -112,27 +116,33 @@
 	# define extrapolation grid based on PSUs
 		input_grid = cbind(psu_coords[,2],psu_coords[,1],0.5^2)
 		colnames(input_grid) = c("Lat","Lon","Area_km2")
-		Extrapolation_List = make_extrapolation_info(Region="user",projargs=slot(crs_eqd,"projargs"),input_grid=input_grid)
-	# add strata definitions for each Island group, STRATA and STRATA_2020
-		a_el_orig = Extrapolation_List$a_el[,1]
-		a_el_tmp = matrix(0,nrow=length(a_el_orig),ncol=1+length(unique(psu_table$Island))+length(unique(psu_table$STRATA))+length(unique(psu_table$STRATA_2020)))
-		colnames(a_el_tmp) = c("All_areas","Niihau","Kauai","Oahu","Maui Nui","Big Island",sort(unique(psu_table$STRATA)),sort(unique(psu_table$STRATA_2020)))
-		a_el_tmp[,1] = a_el_orig
-		for(i in 1:5)
-		{
-			a_el_tmp[which(psu_table$Island == colnames(a_el_tmp)[1+i]),1+i] = a_el_orig[which(psu_table$Island == colnames(a_el_tmp)[1+i])]
-		}
-		for(i in 1:length(unique(psu_table$STRATA)))
-		{
-			a_el_tmp[which(psu_table$STRATA == colnames(a_el_tmp)[6+i]),6+i] = a_el_orig[which(psu_table$STRATA == colnames(a_el_tmp)[6+i])]
-		}
-		for(i in 1:length(unique(psu_table$STRATA_2020)))
-		{
-			a_el_tmp[which(psu_table$STRATA_2020 == colnames(a_el_tmp)[16+i]),16+i] = a_el_orig[which(psu_table$STRATA_2020 == colnames(a_el_tmp)[16+i])]
-		}
+    if(load_spatial)
+    {
+        load(file=paste0(load_spatial_path,"Extrapolation_List.RData"))
+    } else {
+            Extrapolation_List = make_extrapolation_info(Region="user",projargs=slot(crs_eqd,"projargs"),input_grid=input_grid)
+        # add strata definitions for each Island group, STRATA and STRATA_2020
+            a_el_orig = Extrapolation_List$a_el[,1]
+            a_el_tmp = matrix(0,nrow=length(a_el_orig),ncol=1+length(unique(psu_table$Island))+length(unique(psu_table$STRATA))+length(unique(psu_table$STRATA_2020)))
+            colnames(a_el_tmp) = c("All_areas","Niihau","Kauai","Oahu","Maui Nui","Big Island",sort(unique(psu_table$STRATA)),sort(unique(psu_table$STRATA_2020)))
+            a_el_tmp[,1] = a_el_orig
+            for(i in 1:5)
+            {
+                a_el_tmp[which(psu_table$Island == colnames(a_el_tmp)[1+i]),1+i] = a_el_orig[which(psu_table$Island == colnames(a_el_tmp)[1+i])]
+            }
+            for(i in 1:length(unique(psu_table$STRATA)))
+            {
+                a_el_tmp[which(psu_table$STRATA == colnames(a_el_tmp)[6+i]),6+i] = a_el_orig[which(psu_table$STRATA == colnames(a_el_tmp)[6+i])]
+            }
+            for(i in 1:length(unique(psu_table$STRATA_2020)))
+            {
+                a_el_tmp[which(psu_table$STRATA_2020 == colnames(a_el_tmp)[16+i]),16+i] = a_el_orig[which(psu_table$STRATA_2020 == colnames(a_el_tmp)[16+i])]
+            }
 
-		Extrapolation_List$a_el = a_el_tmp
-		units(Extrapolation_List$a_el) = "km^2"
+            Extrapolation_List$a_el = a_el_tmp
+            units(Extrapolation_List$a_el) = "km^2"
+    }
+
 
 	# define input mesh
 		# setting the boundary helps restrict the placement of knots to where the data is
@@ -153,7 +163,11 @@
 			mesh_coords_ll = sp::spTransform(mesh_coords_eqd, crs_ll)
 			intensity_loc = mesh_coords_ll@coords 
 		
-		spatial_list = make_spatial_info(n_x=nrow(mesh_coords_ll@coords),
+        if(load_spatial)
+        {
+            load(file=paste0(load_spatial_path,"spatial_list.RData"))
+        } else {
+            spatial_list = make_spatial_info(n_x=nrow(mesh_coords_ll@coords),
     					   Lon_i=bfish_df$lon,
     					   Lat_i=bfish_df$lat,
     					   Extrapolation_List=Extrapolation_List,
@@ -166,6 +180,8 @@
     					   LON_intensity=intensity_loc[,1],
     					   LAT_intensity=intensity_loc[,2],
     					   map_data=hi_coast)
+        }
+
 
 		# add plot to show the mesh structure
 		# pull-out needed quantities for plotting
