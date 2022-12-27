@@ -56,7 +56,7 @@
 	working_dir = paste0(proj.dir,"VAST/model_runs/",as.character(format(Sys.time(),format="%Y-%m-%d")),"/",model_name,"/")
 	dir.create(working_dir,recursive=TRUE)
 
-    load_spatial_path = paste0(proj.dir,"VAST/model_runs/2022-12-23/pldg_prfi_05_v_v_TRUE_7.5_FALSE_TRUE_pit/")
+    load_spatial_path = paste0(proj.dir,"VAST/model_runs/2022-12-27/2021_pldg_prfi_05_v_v_TRUE_7.5_FALSE_TRUE_pit_xval/")
 	# xval path
     load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
 
