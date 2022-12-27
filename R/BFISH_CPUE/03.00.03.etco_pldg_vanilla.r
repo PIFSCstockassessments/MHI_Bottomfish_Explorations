@@ -23,7 +23,7 @@
 # specify (coarse) model configuration
     data_flag = 2021
     link_function = "pldg" # poisson-link delta-gamma
-    species = "etca"
+    species = "etco"
     data_treatment = "05"
     catchability_covariates = "v" # vanilla
     abundance_covariates = "v" # vanilla
