@@ -32,7 +32,7 @@
     fine_scale = FALSE
     bias_correct = TRUE
 	residual_type = "pit" # other option is one step ahead (osa) which is sloooooow (~30 minutes)
-	xval = "no_xval" # "xval" # warning xval also appears to be quite slow... (~30 minutes)
+	xval = "noxval" # "xval" # warning xval also appears to be quite slow... (~30 minutes)
 
     # can bring in spatial data from an existing model if spatial structure of data is identical
     load_spatial = TRUE
