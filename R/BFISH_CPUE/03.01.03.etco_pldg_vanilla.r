@@ -298,9 +298,9 @@
 		# turn off estimation of components if poorly estimated
         # are mean estimates for L_ components going to zero
         # or are any variances blowing up
-			fit_setup$parameter_estimates$SD
-			# everything looks good so no need to modify FieldConfig
-			# settings$FieldConfig = matrix( c("IID","IID","IID","IID","IID","IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
+			fit_setup$parameter_estimates
+			# variance of Omega/Epsilon 2 looks to be blowing up
+			settings$FieldConfig = matrix( c("IID","IID","IID",0,0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
 
 
 		fit = fit_model( settings=settings,
@@ -322,7 +322,7 @@
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
     	  						spatial_list = spatial_list,
     	  						test_fit=TRUE)
-		fit$parameter_estimates$SD
+		fit$parameter_estimates
 
 		# bias correction
 			if(bias_correct)
