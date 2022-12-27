@@ -762,7 +762,8 @@
 			mv_dt = as.data.table(index$Table)
 			mv_dt$Estimate = Sdreport$unbiased$value[names(Sdreport$unbiased$value)=="Index_ctl"]
 			mv_dt = mv_dt%>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+                .[,Category:=target_species] %>%
+				.[,Category:=factor(Category,levels=target_species,labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%
@@ -776,7 +777,8 @@
 				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
 		} else {
 			mv_dt = as.data.table(index$Table) %>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+                .[,Category:=target_species] %>%
+				.[,Category:=factor(Category,levels=target_species,labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%

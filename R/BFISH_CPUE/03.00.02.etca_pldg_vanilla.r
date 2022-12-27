@@ -299,8 +299,8 @@
         # are mean estimates for L_ components going to zero
         # or are any variances blowing up
 			fit_setup$parameter_estimates$SD
-			# in this case it looks like the mean estimate of L_epsilon2_z is going to 0
-			settings$FieldConfig = matrix( c("IID","IID","IID","IID",0,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
+			# everything looks good so no need to modify FieldConfig
+			# settings$FieldConfig = matrix( c("IID","IID","IID","IID","IID","IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) )
 
 
 		fit = fit_model( settings=settings,
@@ -762,7 +762,8 @@
 			mv_dt = as.data.table(index$Table)
 			mv_dt$Estimate = Sdreport$unbiased$value[names(Sdreport$unbiased$value)=="Index_ctl"]
 			mv_dt = mv_dt%>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+                .[,Category:=target_species] %>%
+				.[,Category:=factor(Category,levels=target_species,labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%
@@ -776,7 +777,8 @@
 				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
 		} else {
 			mv_dt = as.data.table(index$Table) %>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+                .[,Category:=target_species] %>%
+				.[,Category:=factor(Category,levels=target_species,labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2021)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%
