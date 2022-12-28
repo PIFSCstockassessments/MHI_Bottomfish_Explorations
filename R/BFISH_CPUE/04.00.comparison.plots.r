@@ -21,6 +21,10 @@
 	dir_plot = paste0(proj.dir,"VAST/model_runs/comparison_plots/")
 	dir.create(dir_plot,recursive = TRUE)
 
+    deep7_code_vec = tolower(c("ETCA","APRU","PRSI","HYQU","PRFI","PRZO","ETCO"))
+	deep7_name_vec = c("Ehu (ETCA)", "Lehi (APRU)", "Kalekale (PRSI)", "Hapu'upu'u (HYQU)", "'Opakapaka (PRFI)", "Gindai (PRZO)", "Onaga (ETCO)")
+		
+
 #_____________________________________________________________________________________________________________________________
 # bring in indices
     # design based bfish index data is in kg so convert to lbs (millions)
@@ -29,7 +33,10 @@
                 .[,Estimate:=Estimate*2.20462262185] %>%
 				.[,Estimate:=Estimate/1000000] %>%
 				.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
-				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
+				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))] %>%
+                .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                .[is.na(Category),Category:="Total"] %>%
+                .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 
 #_____________________________________________________________________________________________________________________________
 # plot 1) apru single species, poisson-link delta-gamma model
@@ -40,12 +47,19 @@
     # Note: index_dt is in lbs (millions)
 
     apru_filter_dt = fread(paste0(proj.dir,"VAST/model_runs/2022-12-27/2021_pldg_apru_05_v_v_TRUE_7.5_FALSE_TRUE_pit_noxval/index_dt.csv")) %>%
-                     .[,Model:="model - filter"]
+                     .[,Model:="model - filter"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+
     apru_nofilter_dt = fread(paste0(proj.dir,"VAST/model_runs/2022-12-27/2021_pldg_apru_05_v_v_FALSE_7.5_FALSE_TRUE_pit_noxval/index_dt.csv")) %>%
-                     .[,Model:="model - no filter"]
+                     .[,Model:="model - no filter"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 
     p1 = rbind(design_dt,apru_filter_dt,apru_nofilter_dt) %>%
-            .[Category == "apru"] %>%
+            .[Category == "Lehi (APRU)"] %>%
             ggplot() +
 			ylim(0,NA) +
 			ylab("Predicted biomass (millions lbs)") +

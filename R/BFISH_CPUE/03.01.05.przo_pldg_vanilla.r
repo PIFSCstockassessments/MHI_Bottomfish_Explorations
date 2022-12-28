@@ -67,7 +67,7 @@
 	# subset to species
     if(species == "mv")
     { 
-        target_species = c("prfi","etco","etca","prsi","przo","hyqu","apru")
+        target_species = c("prfi","etca","etco","prsi","przo","hyqu","apru")
     } else{
         target_species = species
     }
