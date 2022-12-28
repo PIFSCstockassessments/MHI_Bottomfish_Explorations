@@ -71,7 +71,7 @@
     } else{
         target_species = species
     }
-	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% species] %>% as.data.frame(.)
+	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% target_species] %>% as.data.frame(.)
 	
 	# remove sample with large lehi observation
     if(lehi_filter)
