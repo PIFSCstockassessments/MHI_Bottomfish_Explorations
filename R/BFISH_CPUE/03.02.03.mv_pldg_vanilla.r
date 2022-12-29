@@ -301,10 +301,10 @@
         # or are any variances blowing up
 			fit_setup$parameter_estimates
 			# suggestions for problematic parameters
-			which(abs(fit_setup$ParHat$L_omega1_z)<1e-4|abs(fit_setup$ParHat$L_omega1_z)>1.5e1)
-			which(abs(fit_setup$ParHat$L_epsilon1_z)<1e-4|abs(fit_setup$ParHat$L_epsilon1_z)>1.5e1)
-			which(abs(fit_setup$ParHat$L_omega2_z)<1e-4|abs(fit_setup$ParHat$L_omega2_z)>1.5e1)
-			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-4|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_omega1_z)<1e-5|abs(fit_setup$ParHat$L_omega1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_epsilon1_z)<1e-5|abs(fit_setup$ParHat$L_epsilon1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_omega2_z)<1e-5|abs(fit_setup$ParHat$L_omega2_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-5|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,NA)
