@@ -262,7 +262,7 @@
     } else if(link_function == "lgdg"){
         obs_model = c(2,3)
     } else if(link_function == "pldl"){
-        obs_model = c(1,4)
+        obs_model = c(4,4)
     } else if(link_function == "plgg"){
         obs_model = c(9,4)
     }
@@ -315,8 +315,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,NA)
 			epsilon1_map = c(1,2,NA,3,4,5,6)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,NA,3,4,5,6)
+			omega2_map = c(1,2,NA,NA,NA,NA,NA)
+			epsilon2_map = c(NA,NA,NA,NA,NA,1,NA)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -1204,8 +1204,8 @@
 
 				xval_fit$input_args$spatial_args_input = list(
 														n_x=xval_spatial_list$n_x,
-														Lon_i=xval_test_df$lon,
-														Lat_i=xval_test_df$lat,
+														Lon_i=xval_train_df$lon,
+														Lat_i=xval_train_df$lat,
 														Extrapolation_List=xval_extrapolation_list,
 														Method = "Barrier",
 														anisotropic_mesh = xval_spatial_list$MeshList$anisotropic_mesh,

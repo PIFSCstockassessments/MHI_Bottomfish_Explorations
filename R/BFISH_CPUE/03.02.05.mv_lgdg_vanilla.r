@@ -262,7 +262,7 @@
     } else if(link_function == "lgdg"){
         obs_model = c(2,3)
     } else if(link_function == "pldl"){
-        obs_model = c(1,4)
+        obs_model = c(4,4)
     } else if(link_function == "plgg"){
         obs_model = c(9,4)
     }
