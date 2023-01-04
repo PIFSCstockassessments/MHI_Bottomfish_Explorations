@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type:species_cd
-        q2_formula = ~ gear_type:species_cd
+        q1_formula = ~ gear_type:category
+        q2_formula = ~ gear_type:category
 
 	# needed to define spatial domain and for predicting on to create index
 	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
@@ -1136,7 +1136,11 @@
 	
 		# influence plots
 	# spatial effects are not standardized out, they are assumed to impact abundance
-        qeffect_1 = fit$data_list$Q1_ik %*% matrix(fit$ParHat$lambda1_k,nrow=1,ncol=length(fit$ParHat$lambda1_k))
+        qeffect_1 = fit$data_list$Q1_ik 
+		for(i in 1:nrow(qeffect_1))
+		{
+			qeffect_1[i,] = qeffect_1[i,] * fit$ParHat$lambda1_k
+		}
         dimnames(qeffect_1) = dimnames(fit$data_list$Q1_ik)
         qeffectnames_1 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
@@ -1156,8 +1160,12 @@
         qeffect_1_dt = as.data.table(cbind(bfish_df[,c("year","species_cd")],format_qeffect_1)) %>%
                         .[,component:="1st"]
 
-        qeffect_2 = fit$data_list$Q2_ik %*% matrix(fit$ParHat$lambda2_k,nrow=1,ncol=length(fit$ParHat$lambda2_k))
-        dimnames(qeffect_2) = dimnames(fit$data_list$Q2_ik)
+        qeffect_2 = fit$data_list$Q2_ik 
+       for(i in 1:nrow(qeffect_2))
+		{
+			qeffect_2[i,] = qeffect_2[i,] * fit$ParHat$lambda2_k
+		}
+	    dimnames(qeffect_2) = dimnames(fit$data_list$Q2_ik)
         qeffectnames_2 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
         format_qeffect_2 = matrix(NA,nrow=nrow(qeffect_2),ncol=length(qeffectnames_2))
@@ -1217,7 +1225,6 @@
 
 		p = copy(influ_dt) %>%
 			ggplot() +
-			ylim(0.6,1.4) +
 			ylab("Influence") +
 			xlab("Year") +
 			facet_grid(component~species) +
@@ -1275,7 +1282,6 @@
 	    p = copy(plot_effect_dt) %>%
             .[component=="1st"] %>%
 			ggplot() +
-			ylim(0.6,1.4) +
 			ylab("Effect") +
 			xlab("Variable") +
 			facet_grid(covariate~species,scales="free_x") +
@@ -1291,7 +1297,6 @@
 	    p = copy(plot_effect_dt) %>%
             .[component=="2nd"] %>%
 			ggplot() +
-			ylim(0.6,1.4) +
 			ylab("Effect") +
 			xlab("Variable") +
 			facet_grid(covariate~species,scales="free_x") +
