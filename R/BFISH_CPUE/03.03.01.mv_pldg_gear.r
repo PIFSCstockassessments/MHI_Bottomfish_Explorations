@@ -80,8 +80,9 @@
     }
 	
     # define catchability section
-        q_data = bfish_df[,c("species_cd","gear_type")]
-        q_data$species_cd = factor(q_data[,'species_cd'],levels=c(target_species))
+        q_data = bfish_df[,c("year","species_cd","gear_type")]
+        colnames(q_data)[2] = "category"
+        q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
         q1_formula = ~ gear_type
@@ -1110,7 +1111,7 @@
 	# spatial effects are not standardized out, they are assumed to impact abundance
         qeffect_1 = fit$data_list$Q1_ik %*% matrix(fit$ParHat$lambda1_k,nrow=1,ncol=length(fit$ParHat$lambda1_k))
         dimnames(qeffect_1) = dimnames(fit$data_list$Q1_ik)
-        qeffectnames_1 = names(fit$effects$catchability_data_full)[-c(1,ncol(fit$effects$catchability_data_full))]
+        qeffectnames_1 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
         format_qeffect_1 = matrix(NA,nrow=nrow(qeffect_1),ncol=length(qeffectnames_1))
         colnames(format_qeffect_1) = qeffectnames_1
@@ -1130,7 +1131,7 @@
 
         qeffect_2 = fit$data_list$Q2_ik %*% matrix(fit$ParHat$lambda2_k,nrow=1,ncol=length(fit$ParHat$lambda2_k))
         dimnames(qeffect_2) = dimnames(fit$data_list$Q2_ik)
-        qeffectnames_2 = names(fit$effects$catchability_data_full)[-c(1,ncol(fit$effects$catchability_data_full))]
+        qeffectnames_2 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
         format_qeffect_2 = matrix(NA,nrow=nrow(qeffect_2),ncol=length(qeffectnames_2))
         colnames(format_qeffect_2) = qeffectnames_2

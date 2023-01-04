@@ -80,8 +80,9 @@
     }
 	
     # define catchability section
-        q_data = bfish_df[,c("species_cd","gear_type")]
-        q_data$species_cd = factor(q_data[,'species_cd'],levels=c(target_species))
+        q_data = bfish_df[,c("year","species_cd","gear_type")]
+        colnames(q_data)[2] = "category"
+        q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
         q1_formula = ~ gear_type:species_cd
@@ -309,6 +310,32 @@
 		# turn off estimation of components if poorly estimated
         # are mean estimates for L_ components going to zero
         # or are any variances blowing up
+		if(length(fit_setup$parameter_estimates)==2)
+		{
+			fit_setup$parameter_estimates$opt
+			# suggestions for problematic parameters
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])>1.5e1)
+
+			modified_map = fit_setup$tmb_list$Map
+			omega1_map = c(1,2,3,4,5,NA,NA)
+			epsilon1_map = c(1,2,NA,3,4,5,6)
+			omega2_map = c(1,2,3,NA,4,NA,NA)
+			epsilon2_map = c(1,2,NA,3,4,5,6)
+			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
+			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
+			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
+			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
+
+			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
+			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
+			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
+			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
+			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+
+		} else {
 			fit_setup$parameter_estimates
 			# suggestions for problematic parameters
 			which(abs(fit_setup$ParHat$L_omega1_z)<1e-3|abs(fit_setup$ParHat$L_omega1_z)>1.5e1)
@@ -331,6 +358,7 @@
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+		}
 
 		fit = fit_model( settings=settings,
  				   				Lon_i=bfish_df$lon,
@@ -1106,11 +1134,11 @@
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)
 	
-	# influence plots
+		# influence plots
 	# spatial effects are not standardized out, they are assumed to impact abundance
         qeffect_1 = fit$data_list$Q1_ik %*% matrix(fit$ParHat$lambda1_k,nrow=1,ncol=length(fit$ParHat$lambda1_k))
         dimnames(qeffect_1) = dimnames(fit$data_list$Q1_ik)
-        qeffectnames_1 = names(fit$effects$catchability_data_full)[-c(1,ncol(fit$effects$catchability_data_full))]
+        qeffectnames_1 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
         format_qeffect_1 = matrix(NA,nrow=nrow(qeffect_1),ncol=length(qeffectnames_1))
         colnames(format_qeffect_1) = qeffectnames_1
@@ -1130,7 +1158,7 @@
 
         qeffect_2 = fit$data_list$Q2_ik %*% matrix(fit$ParHat$lambda2_k,nrow=1,ncol=length(fit$ParHat$lambda2_k))
         dimnames(qeffect_2) = dimnames(fit$data_list$Q2_ik)
-        qeffectnames_2 = names(fit$effects$catchability_data_full)[-c(1,ncol(fit$effects$catchability_data_full))]
+        qeffectnames_2 = names(fit$effects$catchability_data_full)[-c(1:2,ncol(fit$effects$catchability_data_full))]
 
         format_qeffect_2 = matrix(NA,nrow=nrow(qeffect_2),ncol=length(qeffectnames_2))
         colnames(format_qeffect_2) = qeffectnames_2
