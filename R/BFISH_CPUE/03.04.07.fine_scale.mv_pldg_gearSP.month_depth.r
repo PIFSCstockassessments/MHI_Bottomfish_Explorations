@@ -25,7 +25,7 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP.month5" # vanilla
+    catchability_covariates = "gearSP.month" # vanilla
     abundance_covariates = "depth" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -86,7 +86,7 @@
         q_data$gear_type = factor(q_data[,'gear_type'])
 		q_data$month = as.numeric(as.character(q_data[,'month']))
 
-        q1_formula = ~ gear_type:category + category:bs(month,df=5)
+        q1_formula = ~ gear_type:category + bs(month,df=3)
         q2_formula = ~ gear_type:category
 
         continuous_q_variables = c("month")
@@ -493,6 +493,7 @@
 			rmse_dt = rbind(rmse_agg_dt,rmse_spec_dt,rmse_year_dt,rmse_island_dt,rmse_gear_dt,rmse_strata_dt)
 			fwrite(rmse_dt,file=paste0(working_dir,"rmse_dt.csv"))
 			gc()
+
 
 #_____________________________________________________________________________________________________________________________
 # 4) Model diagnostics & plot output
@@ -1420,4 +1421,5 @@
 						dpi = 300, limitsize = TRUE)
 
         }
+
         

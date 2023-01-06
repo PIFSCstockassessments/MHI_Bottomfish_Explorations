@@ -80,7 +80,7 @@
     }
 	
     # define catchability section
-        q_data = bfish_df[,c("year","species_cd","gear_type","time")]
+        q_data = bfish_df[,c("year","species_cd","gear_type")]
         colnames(q_data)[2] = "category"
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
