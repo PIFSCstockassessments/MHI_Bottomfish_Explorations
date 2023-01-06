@@ -248,7 +248,6 @@
 			xlab("Year") +
 			facet_wrap(~Category,scales="free") +
 			geom_hline(yintercept=0) +
-			geom_hline(yintercept=1,linetype="dashed") +
 			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Model),alpha=0.25) +
 			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
 			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
@@ -279,3 +278,66 @@
 	  			dpi = 300, limitsize = TRUE)   
   
 
+#_____________________________________________________________________________________________________________________________
+# plot 5) compare multi-species with catchability covariates
+# data type: 05
+    base_dt = fread(paste0(proj.dir,"VAST/model_runs/2022-12-29/2021_pldg_mv_05_v_v_TRUE_7.5_FALSE_TRUE_pit_xval/index_dt.csv")) %>%
+                     .[,Model:="01 base"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    gear_dt = fread(paste0(proj.dir,"VAST/model_runs/2023-01-03/2021_pldg_mv_05_gear_v_TRUE_7.5_FALSE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="02 gear"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    gearSP_dt = fread(paste0(proj.dir,"VAST/model_runs/2023-01-03/2021_pldg_mv_05_gearSP_v_TRUE_7.5_FALSE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="03 gearSP"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    gearSP_lunar_dt = fread(paste0(proj.dir,"VAST/model_runs/2023-01-04/2021_pldg_mv_05_gearSP.lunarphase_v_TRUE_7.5_FALSE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="04 gearSP.lunar"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+
+    p5 = rbind(base_dt,gear_dt,gearSP_dt,gearSP_lunar_dt,design_dt) %>%
+            .[Model=="design",Model:="00 design"] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Predicted biomass (millions lbs)") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Model),alpha=0.25) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p5_catchability_covariates.png"), plot = p5, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)                        
+
+  	p5 = rbind(base_dt,gear_dt,gearSP_dt,gearSP_lunar_dt,design_dt) %>%
+            .[Model=="design",Model:="00 design"] %>%
+			.[,Estimate:=Estimate/mean(Estimate),by=.(Model,Category)] %>%
+			.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
+			.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Relative biomass") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_hline(yintercept=1,linetype="dashed") +
+			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Model),alpha=0.25) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p5_catchability_covariates_relative.png"), plot = p5, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)   
+   
+   

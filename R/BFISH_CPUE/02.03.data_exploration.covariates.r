@@ -15,7 +15,7 @@
 # 1) bring in data
     data_flag = 2021
     species = "mv"
-    data_treatment = "05"
+    data_treatment = "01"
     lehi_filter = TRUE
 	load(file=paste0(proj.dir,"Data/",data_flag,"_",data_treatment,".bfish_combined_long_dt.RData"))
 
@@ -123,3 +123,43 @@
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)	
 	}		
+
+
+					p = copy(explore_dt) %>%
+					setnames(.,"depth","target") %>%
+					.[,weight_kg:=ifelse(weight_kg>0,1,0)] %>%
+					ggplot() +
+					ggtitle("1st component") +
+					ylab("Empricial effect") +
+					xlab("Variable") +
+					coord_cartesian(ylim=c(0,NA)) +
+					# facet_wrap(~species_cd,scales="free_y") +
+					geom_rug(aes(x=target),alpha=0.25) +
+					geom_smooth(aes(x=target,y=weight_kg,color=gear_type)) +
+					theme_few(base_size=20) +
+					theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+					viridis::scale_color_viridis("gear_type",discrete=TRUE,begin = 0.1,end = 0.8,direction = 1,option = "H")
+					ggsave(filename=paste0(data_flag,".",species,".",data_treatment,".",lehi_filter,".","depth_by_gear_agg",".1st.png"), plot = p, device = "png", path = plot_dir,
+						scale = 1, width = 16, height = 9, units = c("in"),
+						dpi = 300, limitsize = TRUE)
+					
+					p = copy(explore_dt) %>%
+					setnames(.,"depth","target") %>%
+					.[,weight_kg:=ifelse(weight_kg>0,1,0)] %>%
+					ggplot() +
+					ggtitle("1st component") +
+					ylab("Empricial effect") +
+					xlab("Variable") +
+					coord_cartesian(ylim=c(0,NA)) +
+					facet_wrap(~species_cd,scales="free_y") +
+					geom_rug(aes(x=target),alpha=0.25) +
+					geom_smooth(aes(x=target,y=weight_kg,color=gear_type)) +
+					theme_few(base_size=20) +
+					theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+					viridis::scale_color_viridis("gear_type",discrete=TRUE,begin = 0.1,end = 0.8,direction = 1,option = "H")
+					ggsave(filename=paste0(data_flag,".",species,".",data_treatment,".",lehi_filter,".","depth_by_gear",".1st.png"), plot = p, device = "png", path = plot_dir,
+						scale = 1, width = 16, height = 9, units = c("in"),
+						dpi = 300, limitsize = TRUE)
+
+
+
