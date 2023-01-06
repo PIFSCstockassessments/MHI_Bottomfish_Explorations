@@ -15,7 +15,7 @@
 # 1) bring in data
     data_flag = 2021
     species = "mv"
-    data_treatment = "01"
+    data_treatment = "05"
     lehi_filter = TRUE
 	load(file=paste0(proj.dir,"Data/",data_flag,"_",data_treatment,".bfish_combined_long_dt.RData"))
 
@@ -34,10 +34,19 @@
         bfish_df =  subset(bfish_df,design_sampling_unit!="2021_Fall_32293")
     }
 	
+	# needed to define spatial domain and for predicting on to create index
+	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
+				.[,.(PSU,Island,lon_deg,lat_deg,STRATA,STRATA_2020,Depth_MEDIAN_m,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)] %>%
+				.[,substrate:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][1])] %>%
+				.[,slope:=sapply(STRATA,function(x)strsplit(x,"_")[[1]][2])] %>%
+				setnames(.,"PSU","psu")
 
 #_____________________________________________________________________________________________________________________________
 # covariate exploration: categorical
-	explore_dt = as.data.table(bfish_df)
+	explore_dt = as.data.table(bfish_df) %>%
+				 merge(.,psu_table[,.(psu,med_slp,med_acr,BS_pct_over_136j,pctHB,pctHS)],by="psu") %>%
+				 .[med_acr>300,med_acr:=300]
+				 
 	target_vec = c("island","strata","strata_2020","substrate","slope","depth_strata","depth_strata_2020","complexity","hardness","year","season","month","gear_type","platform")
 	
 	for(i in 1:length(target_vec))
@@ -85,7 +94,7 @@
 						dpi = 300, limitsize = TRUE)	
 	}
 
-	target_vec = c("jd","lon","lat","depth","time","lunar_phase","obs_wind","obs_wave")
+	target_vec = c("jd","lon","lat","depth","time","lunar_phase","obs_wind","obs_wave","med_slp","med_acr","BS_pct_over_136j","pctHB","pctHS")
 	
 	for(i in 1:length(target_vec))
 	{

@@ -25,7 +25,7 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP.month3" # vanilla
+    catchability_covariates = "gearSP.monthEP" # vanilla
     abundance_covariates = "depth" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -86,8 +86,8 @@
         q_data$gear_type = factor(q_data[,'gear_type'])
 		q_data$month = as.numeric(as.character(q_data[,'month']))
 
-        q1_formula = ~ gear_type:category + category:bs(month,df=3)
-        q2_formula = ~ gear_type:category
+        q1_formula = ~ gear_type:category + bs(month,df=3)
+        q2_formula = ~ gear_type:category + bs(month,df=3)
 
         continuous_q_variables = c("month")
 
@@ -1422,4 +1422,40 @@
 
         }
 
-		
+ # plot abundance covariates
+            abundance_effect_dt.list = as.list(rep(NA,length(continuous_ab_variables)))
+            for(i in 1:length(continuous_ab_variables))
+            {
+                abundance_effect_dt.list[[i]] = as.list(rep(NA,length(target_species)))
+                tmp_cols = continuous_ab_variables[i]
+                for(s in 1:length(target_species))
+                {
+                    abundance_effect_dt.list[[i]][[s]] = as.data.table(ab_df) %>%
+                    .[,..tmp_cols] %>%
+                    .[,value:=fit$data_list$X1_gctp[,s,1,grep(continuous_ab_variables[i],dimnames(fit$data_list$X1_gctp)[[4]])] %*% t(t(fit$ParHat$gamma1_cp[s,]))] %>%
+                    .[,species_cd:=target_species[s]] %>%
+                    setnames(.,tmp_cols,"variable") %>%
+                    .[,value_link:=exp(value)] %>%
+                    .[,category:=tmp_cols] %>%
+                    .[,component:="1st"]
+
+                }
+                abundance_effect_dt.list[[i]] = rbindlist(abundance_effect_dt.list[[i]])
+                rm(list="tmp_cols")
+            }    
+
+            plot_ae1_dt = rbindlist(abundance_effect_dt.list)
+             p = copy(plot_ae1_dt) %>%
+            .[component=="1st"] %>%
+			ggplot() +
+			ylab("Effect") +
+			xlab("Variable") +
+			facet_wrap(category~species_cd,scales="free",ncol=7) +
+			geom_hline(yintercept=1,linetype="dashed") +
+			geom_line(aes(x=variable,y=value_link,color=species_cd)) +
+            theme_few(base_size=20) +
+            theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+            viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H")
+			ggsave(filename=paste0("continuous_abundance_effect_by_species_1st.png"), plot = p, device = "png", path = working_dir,
+						scale = 1, width = 16, height = 9, units = c("in"),
+						dpi = 300, limitsize = TRUE)        

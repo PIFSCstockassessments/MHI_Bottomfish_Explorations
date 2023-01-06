@@ -25,8 +25,8 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP.month3" # vanilla
-    abundance_covariates = "depth" # vanilla
+    catchability_covariates = "gearSP" # vanilla
+    abundance_covariates = "depth.complexity.hardness" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
     fine_scale = TRUE
@@ -80,16 +80,15 @@
     }
 	
     # define catchability section
-        q_data = bfish_df[,c("year","species_cd","gear_type","month")]
+        q_data = bfish_df[,c("year","species_cd","gear_type")]
         colnames(q_data)[2] = "category"
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
-		q_data$month = as.numeric(as.character(q_data[,'month']))
 
-        q1_formula = ~ gear_type:category + category:bs(month,df=3)
+        q1_formula = ~ gear_type:category
         q2_formula = ~ gear_type:category
 
-        continuous_q_variables = c("month")
+        continuous_q_variables = c()
 
 	# needed to define spatial domain and for predicting on to create index
 	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
@@ -103,15 +102,18 @@
 	# define abundance section
 		ab_df = copy(psu_table) %>%
                         .[STRATA=="SB_H_S",STRATA:="SB_A_S"] %>%
-						.[,.(lat_deg,lon_deg,STRATA,Island,Depth_MEDIAN_m)] %>%
-						setnames(.,c("lat_deg","lon_deg","STRATA","Island","Depth_MEDIAN_m"),c("Lat","Lon","strata","island","depth")) %>%
+						.[,.(lat_deg,lon_deg,STRATA,Island,Depth_MEDIAN_m,med_acr,BS_pct_over_136j)] %>%
+						setnames(.,c("lat_deg","lon_deg","STRATA","Island","Depth_MEDIAN_m","med_acr","BS_pct_over_136j"),c("Lat","Lon","strata","island","depth","complexity","hardness")) %>%
+						.[complexity>300,complexity:=300] %>%
+                        .[is.na(complexity),complexity:=12.20] %>%
+                        .[is.na(hardness),hardness:=0.094888] %>%
 						.[,Year:=NA] %>%
 						as.data.frame(.)
 		
-		ab1_formula = ~ bs(depth,df=5)
+		ab1_formula = ~ bs(depth,df=3) + complexity + hardness
         ab2_formula = ~ 0
 
-        continuous_ab_variables = c("depth")
+        continuous_ab_variables = c("depth","complexity","hardness")
 
 	
 
@@ -1398,10 +1400,10 @@
 			xlab("Variable") +
 			facet_grid(covariate~species,scales="free_x") +
 			geom_hline(yintercept=1,linetype="dashed") +
-			geom_point(aes(x=variable,y=value_link,color=species)) +
+			geom_path(aes(x=variable,y=value_link,color=species)) +
             theme_few(base_size=20) +
             theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-            viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+            viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H")
 			ggsave(filename=paste0("continuous_effect_by_species_1st.png"), plot = p, device = "png", path = working_dir,
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)
@@ -1415,11 +1417,160 @@
 			geom_path(aes(x=variable,y=value_link,color=species)) +
             theme_few(base_size=20) +
             theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-            viridis::scale_color_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+            viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H")
 			ggsave(filename=paste0("continuous_effect_by_species_2nd.png"), plot = p, device = "png", path = working_dir,
 						scale = 1, width = 16, height = 9, units = c("in"),
 						dpi = 300, limitsize = TRUE)
 
         }
+    
+    # plot abundance covariates
+            abundance_effect_dt.list = as.list(rep(NA,length(continuous_ab_variables)))
+            for(i in 1:length(continuous_ab_variables))
+            {
+                abundance_effect_dt.list[[i]] = as.list(rep(NA,length(target_species)))
+                tmp_cols = continuous_ab_variables[i]
+                for(s in 1:length(target_species))
+                {
+                    abundance_effect_dt.list[[i]][[s]] = as.data.table(ab_df) %>%
+                    .[,..tmp_cols] %>%
+                    .[,value:=fit$data_list$X1_gctp[,s,1,grep(continuous_ab_variables[i],dimnames(fit$data_list$X1_gctp)[[4]])] %*% t(t(fit$ParHat$gamma1_cp[s,]))] %>%
+                    .[,species_cd:=target_species[s]] %>%
+                    setnames(.,tmp_cols,"variable") %>%
+                    .[,value_link:=exp(value)] %>%
+                    .[,category:=tmp_cols] %>%
+                    .[,component:="1st"]
 
-		
+                }
+                abundance_effect_dt.list[[i]] = rbindlist(abundance_effect_dt.list[[i]])
+                rm(list="tmp_cols")
+            }    
+
+            plot_ae1_dt = rbindlist(abundance_effect_dt.list)
+             p = copy(plot_ae1_dt) %>%
+            .[component=="1st"] %>%
+			ggplot() +
+			ylab("Effect") +
+			xlab("Variable") +
+			facet_wrap(category~species_cd,scales="free",ncol=7) +
+			geom_hline(yintercept=1,linetype="dashed") +
+			geom_line(aes(x=variable,y=value_link,color=species_cd)) +
+            theme_few(base_size=20) +
+            theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+            viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H")
+			ggsave(filename=paste0("continuous_abundance_effect_by_species_1st.png"), plot = p, device = "png", path = working_dir,
+						scale = 1, width = 16, height = 9, units = c("in"),
+						dpi = 300, limitsize = TRUE)
+#_____________________________________________________________________________________________________________________________
+# 6) cross-validation
+
+	A = proc.time()
+	if(xval == "xval")
+	{
+		k_folds = length(list.files(load_xval_path))/4
+		valid_vec = rep(NA,k_folds)
+		xval_dt.list = as.list(rep(NA,k_folds))
+
+		for(k in 1:k_folds)
+		{
+			load(file=paste0(load_xval_path,k,"_xval_extrapolation_list.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_spatial_list.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_train_df.RData"))
+        	load(file=paste0(load_xval_path,k,"_xval_test_df.RData"))
+
+			if(target_species != "mv")
+			{
+				tmp_weight_kg = xval_train_df[,target_species]
+				xval_train_df$weight_kg = tmp_weight_kg
+				xval_train_df$species_cd = target_species
+				rm(list="tmp_weight_kg")
+			}
+			
+			xval_working_dir = paste0(working_dir,"xval/",k,"/")
+			dir.create(xval_working_dir,recursive = TRUE)
+
+			xval_fit = fit_model( settings=settings,
+ 				   				Lon_i=xval_train_df$lon,
+    			   				Lat_i=xval_train_df$lat,
+          						t_i=as.integer(xval_train_df$year),
+          						b_i=xval_train_df$weight_kg,
+          						a_i=rep(pi * (0.02760333457^2),nrow(xval_train_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
+	    	  					c_i = as.numeric(factor(xval_train_df[,'species_cd'],levels=c(target_species)))-1,
+	    	  					category_names=c(target_species),
+	    	  					covariate_data = NULL,
+	    	  					catchability_data = NULL,
+          						working_dir = xval_working_dir,
+          						newtonsteps = 1,
+          						# extrapolation list args
+          						extrapolation_list = xval_extrapolation_list,
+          						# spatial list args
+    	  						spatial_list = xval_spatial_list,
+    	  						test_fit=TRUE)
+			
+			if("xval_fit" %in% ls())
+			{
+				valid_vec[k] = k
+
+				if(target_species != "mv")
+				{
+					tmp_weight_kg = xval_test_df[,target_species]
+					xval_test_df$weight_kg = tmp_weight_kg
+					xval_test_df$species_cd = target_species
+					rm(list="tmp_weight_kg")
+				}
+
+				xval_predict_working_dir = paste0(working_dir,"xval/",k,"/predict/")
+				dir.create(xval_predict_working_dir,recursive = TRUE)
+
+				xval_fit$input_args$spatial_args_input = list(
+														n_x=xval_spatial_list$n_x,
+														Lon_i=xval_test_df$lon,
+														Lat_i=xval_test_df$lat,
+														Extrapolation_List=xval_extrapolation_list,
+														Method = "Barrier",
+														anisotropic_mesh = xval_spatial_list$MeshList$anisotropic_mesh,
+														grid_size_km = 0.5,
+														grid_size_LL = 0.5/110,
+														fine_scale = xval_spatial_list$fine_scale,
+														Save_Results = FALSE,
+														LON_intensity=xval_spatial_list$latlon_x[,"Lon"],
+														LAT_intensity=xval_spatial_list$latlon_x[,"Lat"],
+														map_data=hi_coast
+    	  												)
+
+				xval_predict = predict(xval_fit,
+                  what="D_i",
+                  Lat_i=xval_test_df$lat,
+                  Lon_i=xval_test_df$lon,
+                  t_i=as.integer(xval_test_df$year),
+                  a_i=rep(pi * (0.02760333457^2),nrow(xval_test_df)),
+                  c_iz = as.numeric(factor(xval_test_df[,'species_cd'],levels=c(target_species)))-1,
+                  do_checks = TRUE,
+                  working_dir = xval_predict_working_dir )
+
+				  xval_test_df$pred_weight_kg = xval_predict
+				  xval_test_df$partition = k
+
+				  xval_dt.list[[k]] = as.data.table(xval_test_df) %>%
+				  					  .[,.(partition,model_sampling_unit,year,lon,lat,species_cd,weight_kg,pred_weight_kg)]
+
+
+				  rm(list=c("xval_predict_working_dir","xval_predict"))
+				  gc();
+
+			}
+
+			# clean-up
+        	rm(list=c("xval_fit","xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
+			gc();
+		}
+
+		xval_dt = rbindlist(xval_dt.list[na.omit(valid_vec)])
+		xval_rmse_dt = copy(xval_dt) %>%
+					   .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)),nrmse=sqrt(mean((weight_kg-pred_weight_kg)^2))/sd(weight_kg),.N),by=.(partition)]
+		fwrite(xval_dt,file=paste0(working_dir,"xval_dt.csv"))
+		fwrite(xval_rmse_dt,file=paste0(working_dir,"xval_rmse_dt.csv"))
+
+	}
+	B = proc.time()
+	B-A
