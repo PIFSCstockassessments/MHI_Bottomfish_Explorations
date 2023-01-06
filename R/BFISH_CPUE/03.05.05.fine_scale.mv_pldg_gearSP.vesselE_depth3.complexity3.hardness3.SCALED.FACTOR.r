@@ -25,8 +25,8 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP" # vanilla
-    abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
+    catchability_covariates = "gearSP.vesselE" # vanilla
+    abundance_covariates = "depth3.complexity3.hardness3.SCALED.FACTOR" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
     fine_scale = TRUE
@@ -299,13 +299,13 @@
 								 fine_scale=fine_scale,
 								 purpose="index2",
 								 use_anisotropy = FALSE,
-								 FieldConfig=matrix( rep("IID",6), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
+								 FieldConfig=matrix( c(7,7,"IID",7,7,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=FALSE,
 								 max_cells=Inf,
 								 ObsModel=obs_model)
 		settings$grid_size_km = 0.5
-		settings$OverdispersionConfig = c("eta1"=0, "eta2"=0)
+		settings$OverdispersionConfig = c("eta1"=1, "eta2"=0)
 		settings$Options = c( settings$Options, "range_fraction"=0.01 )
 
 	# set-up model
@@ -748,15 +748,24 @@
 				knot_loc_dt = data.table(knot=1:nrow(knot_coords),lon=knot_sp@coords[,1],lat=knot_sp@coords[,2],lon_eqd=knot_sp_eqd@coords[,1],lat_eqd=knot_sp_eqd@coords[,2])
 			predict_knot = merge(predict_knot,knot_loc_dt,by="knot")
 
-            # eta1_dt = as.data.table(fit$Report$eta1_vc) %>% 
+            eta1_dt = as.data.table(fit$Report$eta1_vc) %>% 
+            .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
+            .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
+            melt(.,id.vars="vessel") %>%
+            setnames(.,c("variable","value"),c("species","eta1")) %>%
+			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+            .[order(species,vessel)]
+
+            # eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
             # .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
             # .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
             # melt(.,id.vars="vessel") %>%
-            # setnames(.,c("variable","value"),c("species","eta1")) %>%
+            # setnames(.,c("variable","value"),c("species","eta2")) %>%
 			# .[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
             # .[order(species,vessel)]
-            # eta_dt = rbind(eta1_dt) %>%
-            #           melt(.,id.vars=c("species","vessel"))
+            
+			eta_dt = rbind(eta1_dt) %>%
+                      melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
 				.[,knot:=1:nrow(fit$Report$Omega1_gc)] %>%
@@ -886,37 +895,37 @@
 	  			scale = 1.25, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
-            #     p = copy(eta_dt) %>%
-			# 		ggplot() +
-			# 		ggtitle("Vessel overdispersion") +
-			# 		facet_grid(species~variable,scales="free_y") +
-			# 		xlab("Vessel") +
-			# 		ylab("Random effect") +
-			# 		geom_hline(yintercept=0) +
-            #         geom_segment(aes(x=vessel,xend=vessel,y=0,yend=value)) +
-			# 		geom_point(aes(x=vessel,y=value,fill=vessel),shape=21,size=3) +
-			# 		ggthemes::theme_few(base_size=20) + 
-            #         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-			# 		viridis::scale_fill_viridis("Vessel",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-			# ggsave(filename=paste0("pred_eta_agg.png"), plot = p, device = "png", path = working_dir,
-	  		# 	scale = 1.25, width = 9, height = 9, units = c("in"),
-	  		# 	dpi = 300, limitsize = TRUE)
+                p = copy(eta_dt) %>%
+					ggplot() +
+					ggtitle("Vessel overdispersion") +
+					facet_grid(species~variable,scales="free_y") +
+					xlab("Vessel") +
+					ylab("Random effect") +
+					geom_hline(yintercept=0) +
+                    geom_segment(aes(x=vessel,xend=vessel,y=0,yend=value)) +
+					geom_point(aes(x=vessel,y=value,fill=vessel),shape=21,size=3) +
+					ggthemes::theme_few(base_size=20) + 
+                    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+					viridis::scale_fill_viridis("Vessel",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			ggsave(filename=paste0("pred_eta_agg.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
 
-            #     p = copy(eta_dt) %>%
-			# 		ggplot() +
-			# 		ggtitle("Vessel overdispersion") +
-			# 		facet_grid(~variable,scales="free_y") +
-			# 		xlab("Species") +
-			# 		ylab("Random effect") +
-			# 		geom_hline(yintercept=0) +
-			# 		geom_boxplot(aes(x=species,y=value,fill=species)) +
+                p = copy(eta_dt) %>%
+					ggplot() +
+					ggtitle("Vessel overdispersion") +
+					facet_grid(~variable,scales="free_y") +
+					xlab("Species") +
+					ylab("Random effect") +
+					geom_hline(yintercept=0) +
+					geom_boxplot(aes(x=species,y=value,fill=species)) +
 
-			# 		ggthemes::theme_few(base_size=20) + 
-            #         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-			# 		viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-			# ggsave(filename=paste0("pred_eta_agg_boxplot.png"), plot = p, device = "png", path = working_dir,
-	  		# 	scale = 1.25, width = 9, height = 9, units = c("in"),
-	  		# 	dpi = 300, limitsize = TRUE)
+					ggthemes::theme_few(base_size=20) + 
+                    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+					viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			ggsave(filename=paste0("pred_eta_agg_boxplot.png"), plot = p, device = "png", path = working_dir,
+	  			scale = 1.25, width = 9, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)
 
 				# trim tails function comes from
 				# https://stackoverflow.com/questions/44628130/ggplot2-dealing-with-extremes-values-by-setting-a-continuous-color-scale
@@ -1276,13 +1285,27 @@
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
 
-        # eta1_influ_dt = as.data.table(bfish_df) %>%
+        eta1_influ_dt = as.data.table(bfish_df) %>%
+        .[,.(year,platform,species_cd)] %>%
+        setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
+        merge(.,eta1_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
+        .[,component:="1st"] %>%
+        .[,vessel:=NULL] %>%
+        setnames(.,"eta1","eta") %>%
+     	  melt(.,id.vars=c("component","species","year")) %>%
+          .[,rho:=mean(value),by=.(component,species,variable)] %>%
+				   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
+				   .[,delta:=delta_sum/N] %>%
+				   .[,influ:=exp(delta)] %>%
+				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
+
+        # eta2_influ_dt = as.data.table(bfish_df) %>%
         # .[,.(year,platform,species_cd)] %>%
         # setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
-        # merge(.,eta1_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
-        # .[,component:="1st"] %>%
+        # merge(.,eta2_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
+        # .[,component:="2nd"] %>%
         # .[,vessel:=NULL] %>%
-        # setnames(.,"eta1","eta") %>%
+        # setnames(.,"eta2","eta") %>%
      	#   melt(.,id.vars=c("component","species","year")) %>%
         #   .[,rho:=mean(value),by=.(component,species,variable)] %>%
 		# 		   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
@@ -1314,8 +1337,9 @@
 				   .[,delta:=delta_sum/N] %>%
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)] %>%
-                    rbind(.,qinflu_dt) # %>%
-                #    rbind(.,eta1_influ_dt)
+                    rbind(.,qinflu_dt) %>%
+                	rbind(.,eta1_influ_dt) # %>%
+					# rbind(.,eta2_influ_dt)
 		fwrite(influ_dt,file=paste0(working_dir,"influ_dt.csv"))
 
 		p = copy(influ_dt) %>% 
