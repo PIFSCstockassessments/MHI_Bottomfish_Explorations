@@ -26,7 +26,7 @@
     species = "mv"
     data_treatment = "05"
     catchability_covariates = "gearSP.vesselEP" # vanilla
-    abundance_covariates = "depth.complexity.hardness.SCALED" # vanilla
+    abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
     fine_scale = TRUE
@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type:category
-        q2_formula = ~ gear_type:category
+        q1_formula = ~ category:gear_type
+        q2_formula = ~ category:gear_type
 
         continuous_q_variables = c()
 
@@ -113,7 +113,7 @@
 						.[,hardness_sc:=scale(hardness)] %>%
 						as.data.frame(.)
 		
-		ab1_formula = ~ bs(depth_sc,df=3) + complexity_sc + hardness_sc
+		ab1_formula = ~ bs(depth_sc,df=3) + bs(complexity_sc,df=3) + bs(hardness_sc,df=3)
         ab2_formula = ~ 0
 
         continuous_ab_variables = c("depth_sc","complexity_sc","hardness_sc")
