@@ -25,8 +25,8 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP.vesselE" # vanilla
-    abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
+    catchability_covariates = "gearSP.vesselEP" # vanilla
+    abundance_covariates = "depth3.complexity3.hardness3.SCALED.FACTOR" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
     fine_scale = TRUE
@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type:category
-        q2_formula = ~ gear_type:category
+        q1_formula = ~ category:gear_type
+        q2_formula = ~ category:gear_type
 
         continuous_q_variables = c()
 
@@ -299,13 +299,13 @@
 								 fine_scale=fine_scale,
 								 purpose="index2",
 								 use_anisotropy = FALSE,
-								 FieldConfig=matrix( rep("IID",6), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
+								 FieldConfig=matrix( c(7,7,"IID",7,7,"IID"), ncol=2, nrow=3, dimnames=list(c("Omega","Epsilon","Beta"),c("Component_1","Component_2")) ),
 								 Options=c("treat_nonencounter_as_zero"=TRUE ),
 								 bias.correct=FALSE,
 								 max_cells=Inf,
 								 ObsModel=obs_model)
 		settings$grid_size_km = 0.5
-		settings$OverdispersionConfig = c("eta1"=1, "eta2"=0)
+		settings$OverdispersionConfig = c("eta1"=1, "eta2"=1)
 		settings$Options = c( settings$Options, "range_fraction"=0.01 )
 
 	# set-up model
@@ -347,10 +347,10 @@
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,6,7)
-			epsilon1_map = c(1,2,3,4,5,6,7)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,6,NA)
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -371,10 +371,10 @@
 			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-3|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,6,7)
-			epsilon1_map = c(1,2,3,4,5,6,7)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,6,NA)
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -756,15 +756,15 @@
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
             .[order(species,vessel)]
 
-            # eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
-            # .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
-            # .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
-            # melt(.,id.vars="vessel") %>%
-            # setnames(.,c("variable","value"),c("species","eta2")) %>%
-			# .[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            # .[order(species,vessel)]
+            eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
+            .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
+            .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
+            melt(.,id.vars="vessel") %>%
+            setnames(.,c("variable","value"),c("species","eta2")) %>%
+			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+            .[order(species,vessel)]
             
-			eta_dt = rbind(eta1_dt) %>%
+			eta_dt = rbind(eta1_dt,eta2_dt) %>%
                       melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
@@ -1299,19 +1299,19 @@
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
 
-        # eta2_influ_dt = as.data.table(bfish_df) %>%
-        # .[,.(year,platform,species_cd)] %>%
-        # setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
-        # merge(.,eta2_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
-        # .[,component:="2nd"] %>%
-        # .[,vessel:=NULL] %>%
-        # setnames(.,"eta2","eta") %>%
-     	#   melt(.,id.vars=c("component","species","year")) %>%
-        #   .[,rho:=mean(value),by=.(component,species,variable)] %>%
-		# 		   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
-		# 		   .[,delta:=delta_sum/N] %>%
-		# 		   .[,influ:=exp(delta)] %>%
-		# 		   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
+        eta2_influ_dt = as.data.table(bfish_df) %>%
+        .[,.(year,platform,species_cd)] %>%
+        setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
+        merge(.,eta2_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
+        .[,component:="2nd"] %>%
+        .[,vessel:=NULL] %>%
+        setnames(.,"eta2","eta") %>%
+     	  melt(.,id.vars=c("component","species","year")) %>%
+          .[,rho:=mean(value),by=.(component,species,variable)] %>%
+				   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
+				   .[,delta:=delta_sum/N] %>%
+				   .[,influ:=exp(delta)] %>%
+				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
 
 
 		influ1_dt = data.table(component="1st",
@@ -1338,8 +1338,8 @@
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)] %>%
                     rbind(.,qinflu_dt) %>%
-                	rbind(.,eta1_influ_dt) # %>%
-					# rbind(.,eta2_influ_dt)
+                	rbind(.,eta1_influ_dt) %>%
+					rbind(.,eta2_influ_dt)
 		fwrite(influ_dt,file=paste0(working_dir,"influ_dt.csv"))
 
 		p = copy(influ_dt) %>% 

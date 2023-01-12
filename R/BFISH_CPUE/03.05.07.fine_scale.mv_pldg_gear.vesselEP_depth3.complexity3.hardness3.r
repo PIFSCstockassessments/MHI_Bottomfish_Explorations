@@ -349,8 +349,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,5)
-			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			omega2_map = c(1,2,3,NA,4,NA,NA)
+			epsilon2_map = c(1,2,3,4,5,NA,6)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -373,8 +373,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,5)
-			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			omega2_map = c(1,2,3,NA,4,NA,NA)
+			epsilon2_map = c(1,2,3,4,5,NA,6)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -754,7 +754,7 @@
             melt(.,id.vars="vessel") %>%
             setnames(.,c("variable","value"),c("species","eta1")) %>%
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            .[order(species,vessel)]
+            .[order(species,vessel)] 
 
             eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
             .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
@@ -764,7 +764,7 @@
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
             .[order(species,vessel)]
             
-			eta_dt = rbind(eta1_dt,eta2_dt) %>%
+			eta_dt = merge(eta1_dt,eta2_dt) %>%
                       melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
