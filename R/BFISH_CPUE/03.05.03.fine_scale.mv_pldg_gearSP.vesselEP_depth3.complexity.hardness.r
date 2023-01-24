@@ -1302,7 +1302,7 @@
         eta2_influ_dt = as.data.table(bfish_df) %>%
         .[,.(year,platform,species_cd)] %>%
         setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
-        merge(.,eta2_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
+        merge(.,eta2_dt[,.(species,vessel,eta2)],by=c("vessel","species"),all.x=TRUE) %>%
         .[,component:="2nd"] %>%
         .[,vessel:=NULL] %>%
         setnames(.,"eta2","eta") %>%
