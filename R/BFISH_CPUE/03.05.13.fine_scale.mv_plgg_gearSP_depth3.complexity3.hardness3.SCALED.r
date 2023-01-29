@@ -22,10 +22,10 @@
 #_____________________________________________________________________________________________________________________________
 # specify (coarse) model configuration
     data_flag = 2021
-    link_function = "pldg" # poisson-link delta-gamma
+    link_function = "plgg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gear.vesselEP" # vanilla
+    catchability_covariates = "gearSP" # vanilla
     abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -58,7 +58,7 @@
 
     load_spatial_path = paste0(proj.dir,"VAST/model_runs/2023-01-05/2021_pldg_mv_05_gearSP_v_TRUE_7.5_TRUE_TRUE_pit_noxval/")
 	# xval path
-    # load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
+    load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_mv_05_TRUE_7.5_FALSE_10_123/")
 
 #_____________________________________________________________________________________________________________________________
 # 1) bring in data
@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type
-        q2_formula = ~ gear_type
+        q1_formula = ~ gear_type:category
+        q2_formula = ~ gear_type:category
 
         continuous_q_variables = c()
 
@@ -291,6 +291,12 @@
     if(link_function == "pldg")
     {
         obs_model = c(2,4)
+    } else if(link_function == "lgdg"){
+        obs_model = c(2,3)
+    } else if(link_function == "pldl"){
+        obs_model = c(4,4)
+    } else if(link_function == "plgg"){
+        obs_model = c(9,4)
     }
 
 	# make settings
@@ -305,7 +311,7 @@
 								 max_cells=Inf,
 								 ObsModel=obs_model)
 		settings$grid_size_km = 0.5
-		settings$OverdispersionConfig = c("eta1"=1, "eta2"=1)
+		settings$OverdispersionConfig = c("eta1"=0, "eta2"=0)
 		settings$Options = c( settings$Options, "range_fraction"=0.01 )
 
 	# set-up model
@@ -349,8 +355,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,NA,NA,NA,4)
+			epsilon2_map = c(1,2,NA,3,NA,NA,NA)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -373,8 +379,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,NA,NA,NA,4)
+			epsilon2_map = c(1,2,NA,3,NA,NA,NA)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -796,24 +802,15 @@
 				knot_loc_dt = data.table(knot=1:nrow(knot_coords),lon=knot_sp@coords[,1],lat=knot_sp@coords[,2],lon_eqd=knot_sp_eqd@coords[,1],lat_eqd=knot_sp_eqd@coords[,2])
 			predict_knot = merge(predict_knot,knot_loc_dt,by="knot")
 
-            eta1_dt = as.data.table(fit$Report$eta1_vc) %>% 
-            .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
-            .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
-            melt(.,id.vars="vessel") %>%
-            setnames(.,c("variable","value"),c("species","eta1")) %>%
-			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            .[order(species,vessel)] 
-
-            eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
-            .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
-            .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
-            melt(.,id.vars="vessel") %>%
-            setnames(.,c("variable","value"),c("species","eta2")) %>%
-			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            .[order(species,vessel)]
-            
-			eta_dt = merge(eta1_dt,eta2_dt) %>%
-                      melt(.,id.vars=c("species","vessel"))
+            # eta1_dt = as.data.table(fit$Report$eta1_vc) %>% 
+            # .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
+            # .[,vessel:=factor(vessel,levels=c(LETTERS[1:17],"Oscar Elton Sette","Rubber Duck","Steel Toe","Ao Shibi IV"))] %>%
+            # melt(.,id.vars="vessel") %>%
+            # setnames(.,c("variable","value"),c("species","eta1")) %>%
+			# .[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
+            # .[order(species,vessel)]
+            # eta_dt = rbind(eta1_dt) %>%
+            #           melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
 				.[,knot:=1:nrow(fit$Report$Omega1_gc)] %>%
@@ -943,37 +940,37 @@
 	  			scale = 1.25, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
-                p = copy(eta_dt) %>%
-					ggplot() +
-					ggtitle("Vessel overdispersion") +
-					facet_grid(species~variable,scales="free_y") +
-					xlab("Vessel") +
-					ylab("Random effect") +
-					geom_hline(yintercept=0) +
-                    geom_segment(aes(x=vessel,xend=vessel,y=0,yend=value)) +
-					geom_point(aes(x=vessel,y=value,fill=vessel),shape=21,size=3) +
-					ggthemes::theme_few(base_size=20) + 
-                    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-					viridis::scale_fill_viridis("Vessel",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-			ggsave(filename=paste0("pred_eta_agg.png"), plot = p, device = "png", path = working_dir,
-	  			scale = 1.25, width = 9, height = 9, units = c("in"),
-	  			dpi = 300, limitsize = TRUE)
+            #     p = copy(eta_dt) %>%
+			# 		ggplot() +
+			# 		ggtitle("Vessel overdispersion") +
+			# 		facet_grid(species~variable,scales="free_y") +
+			# 		xlab("Vessel") +
+			# 		ylab("Random effect") +
+			# 		geom_hline(yintercept=0) +
+            #         geom_segment(aes(x=vessel,xend=vessel,y=0,yend=value)) +
+			# 		geom_point(aes(x=vessel,y=value,fill=vessel),shape=21,size=3) +
+			# 		ggthemes::theme_few(base_size=20) + 
+            #         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+			# 		viridis::scale_fill_viridis("Vessel",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			# ggsave(filename=paste0("pred_eta_agg.png"), plot = p, device = "png", path = working_dir,
+	  		# 	scale = 1.25, width = 9, height = 9, units = c("in"),
+	  		# 	dpi = 300, limitsize = TRUE)
 
-                p = copy(eta_dt) %>%
-					ggplot() +
-					ggtitle("Vessel overdispersion") +
-					facet_grid(~variable,scales="free_y") +
-					xlab("Species") +
-					ylab("Random effect") +
-					geom_hline(yintercept=0) +
-					geom_boxplot(aes(x=species,y=value,fill=species)) +
+            #     p = copy(eta_dt) %>%
+			# 		ggplot() +
+			# 		ggtitle("Vessel overdispersion") +
+			# 		facet_grid(~variable,scales="free_y") +
+			# 		xlab("Species") +
+			# 		ylab("Random effect") +
+			# 		geom_hline(yintercept=0) +
+			# 		geom_boxplot(aes(x=species,y=value,fill=species)) +
 
-					ggthemes::theme_few(base_size=20) + 
-                    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-					viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-			ggsave(filename=paste0("pred_eta_agg_boxplot.png"), plot = p, device = "png", path = working_dir,
-	  			scale = 1.25, width = 9, height = 9, units = c("in"),
-	  			dpi = 300, limitsize = TRUE)
+			# 		ggthemes::theme_few(base_size=20) + 
+            #         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+			# 		viridis::scale_fill_viridis("Species",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+			# ggsave(filename=paste0("pred_eta_agg_boxplot.png"), plot = p, device = "png", path = working_dir,
+	  		# 	scale = 1.25, width = 9, height = 9, units = c("in"),
+	  		# 	dpi = 300, limitsize = TRUE)
 
 				# trim tails function comes from
 				# https://stackoverflow.com/questions/44628130/ggplot2-dealing-with-extremes-values-by-setting-a-continuous-color-scale
@@ -1333,33 +1330,19 @@
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
 
-        eta1_influ_dt = as.data.table(bfish_df) %>%
-        .[,.(year,platform,species_cd)] %>%
-        setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
-        merge(.,eta1_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
-        .[,component:="1st"] %>%
-        .[,vessel:=NULL] %>%
-        setnames(.,"eta1","eta") %>%
-     	  melt(.,id.vars=c("component","species","year")) %>%
-          .[,rho:=mean(value),by=.(component,species,variable)] %>%
-				   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
-				   .[,delta:=delta_sum/N] %>%
-				   .[,influ:=exp(delta)] %>%
-				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
-
-        eta2_influ_dt = as.data.table(bfish_df) %>%
-        .[,.(year,platform,species_cd)] %>%
-        setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
-        merge(.,eta2_dt[,.(species,vessel,eta2)],by=c("vessel","species"),all.x=TRUE) %>%
-        .[,component:="2nd"] %>%
-        .[,vessel:=NULL] %>%
-        setnames(.,"eta2","eta") %>%
-     	  melt(.,id.vars=c("component","species","year")) %>%
-          .[,rho:=mean(value),by=.(component,species,variable)] %>%
-				   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
-				   .[,delta:=delta_sum/N] %>%
-				   .[,influ:=exp(delta)] %>%
-				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
+        # eta1_influ_dt = as.data.table(bfish_df) %>%
+        # .[,.(year,platform,species_cd)] %>%
+        # setnames(.,c("platform","species_cd"),c("vessel","species")) %>%
+        # merge(.,eta1_dt[,.(species,vessel,eta1)],by=c("vessel","species"),all.x=TRUE) %>%
+        # .[,component:="1st"] %>%
+        # .[,vessel:=NULL] %>%
+        # setnames(.,"eta1","eta") %>%
+     	#   melt(.,id.vars=c("component","species","year")) %>%
+        #   .[,rho:=mean(value),by=.(component,species,variable)] %>%
+		# 		   .[,.(delta_sum=sum(value-rho),.N),by=.(component,species,variable,year)] %>%
+		# 		   .[,delta:=delta_sum/N] %>%
+		# 		   .[,influ:=exp(delta)] %>%
+		# 		   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)]
 
 
 		influ1_dt = data.table(component="1st",
@@ -1385,9 +1368,8 @@
 				   .[,delta:=delta_sum/N] %>%
 				   .[,influ:=exp(delta)] %>%
 				   .[,avg_influ:=exp(mean(delta))-1,by=.(component,species,variable)] %>%
-                    rbind(.,qinflu_dt) %>%
-                	rbind(.,eta1_influ_dt) %>%
-					rbind(.,eta2_influ_dt)
+                    rbind(.,qinflu_dt) # %>%
+                #    rbind(.,eta1_influ_dt)
 		fwrite(influ_dt,file=paste0(working_dir,"influ_dt.csv"))
 
 		p = copy(influ_dt) %>% 
@@ -1617,18 +1599,23 @@
         	load(file=paste0(load_xval_path,k,"_xval_train_df.RData"))
         	load(file=paste0(load_xval_path,k,"_xval_test_df.RData"))
 
-			if(target_species != "mv")
+			if(length(target_species) == 1)
 			{
 				tmp_weight_kg = xval_train_df[,target_species]
 				xval_train_df$weight_kg = tmp_weight_kg
 				xval_train_df$species_cd = target_species
 				rm(list="tmp_weight_kg")
 			}
-			
+
+			train_q_data = xval_train_df[,c("year","species_cd","gear_type")]
+			colnames(train_q_data)[2] = "category"
+			train_q_data$category = factor(train_q_data[,'category'],levels=c(target_species))
+			train_q_data$gear_type = factor(train_q_data[,'gear_type'])
+				
 			xval_working_dir = paste0(working_dir,"xval/",k,"/")
 			dir.create(xval_working_dir,recursive = TRUE)
 
-			xval_fit = fit_model( settings=settings,
+			xval_fit = try(fit_model( settings=settings,
  				   				Lon_i=xval_train_df$lon,
     			   				Lat_i=xval_train_df$lat,
           						t_i=as.integer(xval_train_df$year),
@@ -1636,15 +1623,39 @@
           						a_i=rep(pi * (0.02760333457^2),nrow(xval_train_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
 	    	  					c_i = as.numeric(factor(xval_train_df[,'species_cd'],levels=c(target_species)))-1,
 	    	  					category_names=c(target_species),
-	    	  					covariate_data = NULL,
-	    	  					catchability_data = NULL,
+	    	  					covariate_data = ab_df,
+	    	  					catchability_data = train_q_data,
           						working_dir = xval_working_dir,
           						newtonsteps = 1,
+								X1_formula = ab1_formula,
+								X2_formula = ab2_formula,
+                                Q1_formula = q1_formula,
+                                Q2_formula = q2_formula,
+								Map = modified_map,
+    	  						Parameters = modified_parameters,
           						# extrapolation list args
           						extrapolation_list = xval_extrapolation_list,
           						# spatial list args
     	  						spatial_list = xval_spatial_list,
-    	  						test_fit=TRUE)
+    	  						test_fit=FALSE),silent=TRUE)
+			
+			if(class(xval_fit) == "try-error")
+			{
+				rm(list=c("xval_fit"))
+			}
+			
+			if("xval_fit" %in% ls())
+			{
+				if(length(xval_fit$parameter_estimates)==2)
+				{
+					rm(list=c("xval_fit"))
+				} else {
+					if(xval_fit$parameter_estimates$Convergence_check != "There is no evidence that the model is not converged")
+					{
+						rm(list=c("xval_fit"))
+					}
+				}
+			} 
 			
 			if("xval_fit" %in% ls())
 			{
@@ -1694,13 +1705,13 @@
 				  					  .[,.(partition,model_sampling_unit,year,lon,lat,species_cd,weight_kg,pred_weight_kg)]
 
 
-				  rm(list=c("xval_predict_working_dir","xval_predict"))
+				  rm(list=c("xval_fit","xval_predict_working_dir","xval_predict"))
 				  gc();
 
 			}
 
 			# clean-up
-        	rm(list=c("xval_fit","xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
+        	rm(list=c("xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
 			gc();
 		}
 

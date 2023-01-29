@@ -32,7 +32,7 @@
     fine_scale = TRUE
     bias_correct = TRUE
 	residual_type = "pit" # other option is one step ahead (osa) which is sloooooow (~30 minutes)
-	xval = "noxval" # "xval" # warning xval also appears to be quite slow... (~30 minutes)
+	xval = "xval" # "noxval" # warning xval also appears to be quite slow... (~30 minutes)
 
     # can bring in spatial data from an existing model if spatial structure of data is identical
     load_spatial = TRUE
@@ -58,7 +58,7 @@
 
     load_spatial_path = paste0(proj.dir,"VAST/model_runs/2023-01-05/2021_pldg_mv_05_gearSP_v_TRUE_7.5_TRUE_TRUE_pit_noxval/")
 	# xval path
-    # load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
+    load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_mv_05_TRUE_7.5_FALSE_10_123/")
 
 #_____________________________________________________________________________________________________________________________
 # 1) bring in data
@@ -506,224 +506,272 @@
 
 #_____________________________________________________________________________________________________________________________
 # 4) Model diagnostics & plot output
-	# n_sim = 500
-	# sim_fit = matrix(NA,nrow=length(fit$data_list$b_i),ncol=n_sim)
-	# rs = 123
-	# for(i in 1:n_sim)
-	# {
-	# 	sim_dat = simulate_data( fit,type = 1,random_seed = list(rs+i,NULL)[[1+is.null(rs)]])
-	# 	sim_fit[,i] = sim_dat$b_i
-	# }
+	n_sim = 500
+	sim_fit = matrix(NA,nrow=length(fit$data_list$b_i),ncol=n_sim)
+	rs = 123
+	for(i in 1:n_sim)
+	{
+		sim_dat = simulate_data( fit,type = 1,random_seed = list(rs+i,NULL)[[1+is.null(rs)]])
+		sim_fit[,i] = sim_dat$b_i
+	}
 
-	# save(sim_fit,file=paste0(working_dir,"sim_fit.RData")); gc()
+	save(sim_fit,file=paste0(working_dir,"sim_fit.RData")); gc()
 	
 	pred = fit$Report$D_i
 
-	# # calculate residuals
-	# 	if(residual_type == "pit")
-	# 	{
-	# 		A = proc.time()
-	# 			residuals_dharma = summary(fit,what="residuals",type=1,n_samples=500,random_seed=rs)
-	# 		B = proc.time()
-	# 		B-A
-	# 	} else if(residual_type == "osa"){
-	# 		A = proc.time()
-	# 			osa = TMBhelper::oneStepPredict_deltaModel( obj = fit$tmb_list$Obj,
-	# 			observation.name = "b_i",
-	# 			method = "cdf",
-	# 			data.term.indicator = "keep",
-	# 			deltaSupport = 0,
-	# 			trace = TRUE )
+	# calculate residuals
+		if(residual_type == "pit")
+		{
+			A = proc.time()
+				residuals_dharma = summary(fit,what="residuals",type=1,n_samples=500,random_seed=rs)
+			B = proc.time()
+			B-A
+		} else if(residual_type == "osa"){
+			A = proc.time()
+				osa = TMBhelper::oneStepPredict_deltaModel( obj = fit$tmb_list$Obj,
+				observation.name = "b_i",
+				method = "cdf",
+				data.term.indicator = "keep",
+				deltaSupport = 0,
+				trace = TRUE )
 
-	# 			residuals_dharma = DHARMa::createDHARMa(simulatedResponse=sim_fit,
-	# 			observedResponse=bfish_df$weight_kg,
-	# 			fittedPredictedResponse=pred,
-	# 			integer=FALSE)
-	# 			residuals_dharma$scaledResiduals = pnorm(osa$residual)
-	# 		B = proc.time()
-	# 		B-A
-	# 	}
-	# 	gc()
+				residuals_dharma = DHARMa::createDHARMa(simulatedResponse=sim_fit,
+				observedResponse=bfish_df$weight_kg,
+				fittedPredictedResponse=pred,
+				integer=FALSE)
+				residuals_dharma$scaledResiduals = pnorm(osa$residual)
+			B = proc.time()
+			B-A
+		}
+		gc()
 
-	# # plot diagnostics
+	# plot diagnostics
 
-	# 		if(residual_type == "pit")
-	# 		{
-	# 			residuals_dharma$simulatedResponse = sim_fit
-	# 			residuals_dharma$observedResponse = bfish_df$weight_kg
-	# 		}
+			if(residual_type == "pit")
+			{
+				residuals_dharma$simulatedResponse = sim_fit
+				residuals_dharma$observedResponse = bfish_df$weight_kg
+			}
+			if(sum(is.na(pred))>0)
+			{
+				pred[which(is.na(pred))] = rowMeans(sim_fit[which(is.na(pred)),])
+				residuals_dharma$fittedPredictedResponse = pred
+			}
 
-	# 		# basic QQ & residual v. predicted plot
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_qq.png"),width = 16, height = 9, units = "in",res=300)
-	# 					plot(residuals_dharma)
-	# 				dev.off()
-	# 			# quantile test: residual v. predicted by model covariate
-	# 				png(filename = paste0(working_dir,"dharma_agg_quant_resid.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant = DHARMa::testQuantiles(residuals_dharma)
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_agg_quant_resid_year.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_year = DHARMa::testQuantiles(residuals_dharma,predictor=as.factor(bfish_df$year))
-	# 					DHARMa::plotResiduals(residuals_dharma, form = as.factor(bfish_df$year))
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_agg_quant_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_lon = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df$lon)
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_agg_quant_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_lat = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df$lat)
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_agg_quant_resid_gear.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_gear = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df$gear_type)
-	# 				dev.off()
-	# 			# test for uniformity in residuals, overdispersion, outliers
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
-	# 					tmp_test = DHARMa::testResiduals(residuals_dharma)
-	# 				dev.off()
-	# 			# test for zero inflation
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_test_zi.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_zinf = DHARMa::testZeroInflation(residuals_dharma)
-	# 				dev.off()
-	# 			# test for over-dispersion
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_test_od.png"),width = 9, height = 9, units = "in",res=300)
-	# 					DHARMa::testDispersion(residuals_dharma,alternative="two.sided")
-	# 				dev.off()
-	# 			# test for spatial autocorrelation
-	# 			# DHARMa::testSpatialAutocorrelation needs unique locations
-	# 				bfish_df$spatial_group = as.numeric(as.factor(paste0(bfish_df$lon,"_",bfish_df$lat)))
-	# 				tmp_spatial_group_dt = data.table(spatial_group=bfish_df$spatial_group,x=bfish_df$lon,y=bfish_df$lat) %>%
-	# 							   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
-	# 				residuals_spatial_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$spatial_group)	
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_dharma_sp = DHARMa::testSpatialAutocorrelation(residuals_spatial_group, x = tmp_spatial_group_dt$x, y = tmp_spatial_group_dt$y)
-	# 					text(min(tmp_spatial_group_dt$x),min(tmp_spatial_group_dt$y),paste0("Moran's I p-value: ",round(tmp_dharma_sp$p.value,digits=2)),adj=c(0,0))
-	# 				dev.off()
-	# 			# test for temporal autocorrelation
-	# 				bfish_df$temporal_group = factor(bfish_df$year,levels=as.character(sort(unique(bfish_df$year))))
-	# 				residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
-	# 			 	png(filename = paste0(working_dir,"dharma_agg_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
-	# 					tmp_ar = DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
-	# 				dev.off()
+			# basic QQ & residual v. predicted plot
+				 	png(filename = paste0(working_dir,"dharma_agg_qq.png"),width = 16, height = 9, units = "in",res=300)
+						plot(residuals_dharma)
+					dev.off()
+				# quantile test: residual v. predicted by model covariate
+					png(filename = paste0(working_dir,"dharma_agg_quant_resid.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant = DHARMa::testQuantiles(residuals_dharma)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_agg_quant_resid_year.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_year = DHARMa::testQuantiles(residuals_dharma,predictor=as.factor(bfish_df$year))
+						DHARMa::plotResiduals(residuals_dharma, form = as.factor(bfish_df$year))
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_agg_quant_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_lon = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df$lon)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_agg_quant_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_lat = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df$lat)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_agg_quant_resid_gear.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_gear = DHARMa::testQuantiles(residuals_dharma,predictor=as.factor(bfish_df$gear_type))
+					dev.off()
+				# make residual plots by factor variable
+					residual_factor_vec = c("island","strata","strata_2020",
+											"substrate","slope","depth_strata","depth_strata_2020",
+											"complexity","hardness","season","month","platform")
+					for(v in 1:length(residual_factor_vec))
+					{
+						png(filename = paste0(working_dir,"dharma_agg_quant_resid_",residual_factor_vec[v],".png"),width = 9, height = 9, units = "in",res=300)
+							tmp_quant_factor = DHARMa::testQuantiles(residuals_dharma,predictor=as.factor(as.character(bfish_df[,residual_factor_vec[v]])))
+						dev.off()
+					}
+					residual_continuous_vec = c("depth","time","jd","lunar_phase")
+					residual_continuous_vec_pvalue = rep(NA,length(residual_continuous_vec))
+					for(v in 1:length(residual_continuous_vec))
+					{
+						png(filename = paste0(working_dir,"dharma_agg_quant_resid_",residual_continuous_vec[v],".png"),width = 9, height = 9, units = "in",res=300)
+							tmp_quant_continuous = DHARMa::testQuantiles(residuals_dharma,predictor=bfish_df[,residual_continuous_vec[v]])
+						dev.off()
+						residual_continuous_vec_pvalue[v] = tmp_quant_continuous$p.value
+						rm(list=c("tmp_quant_continuous"))
+					}
+				# test for uniformity in residuals, overdispersion, outliers
+				 	png(filename = paste0(working_dir,"dharma_agg_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
+						tmp_test = DHARMa::testResiduals(residuals_dharma)
+					dev.off()
+				# test for zero inflation
+				 	png(filename = paste0(working_dir,"dharma_agg_test_zi.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_zinf = DHARMa::testZeroInflation(residuals_dharma)
+					dev.off()
+				# test for over-dispersion
+				 	png(filename = paste0(working_dir,"dharma_agg_test_od.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::testDispersion(residuals_dharma,alternative="two.sided")
+					dev.off()
+				# test for spatial autocorrelation
+				# DHARMa::testSpatialAutocorrelation needs unique locations
+					bfish_df$spatial_group = as.numeric(as.factor(paste0(bfish_df$lon,"_",bfish_df$lat)))
+					tmp_spatial_group_dt = data.table(spatial_group=bfish_df$spatial_group,x=bfish_df$lon,y=bfish_df$lat) %>%
+								   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
+					residuals_spatial_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$spatial_group)	
+				 	png(filename = paste0(working_dir,"dharma_agg_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_dharma_sp = DHARMa::testSpatialAutocorrelation(residuals_spatial_group, x = tmp_spatial_group_dt$x, y = tmp_spatial_group_dt$y)
+						text(min(tmp_spatial_group_dt$x),min(tmp_spatial_group_dt$y),paste0("Moran's I p-value: ",round(tmp_dharma_sp$p.value,digits=2)),adj=c(0,0))
+					dev.off()
+				# test for temporal autocorrelation
+					bfish_df$temporal_group = factor(bfish_df$year,levels=as.character(sort(unique(bfish_df$year))))
+					residuals_temporal_group = DHARMa::recalculateResiduals(residuals_dharma, group = bfish_df$temporal_group)	
+				 	png(filename = paste0(working_dir,"dharma_agg_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
+						tmp_ar = DHARMa::testTemporalAutocorrelation(residuals_temporal_group, time=levels(bfish_df$temporal_group))
+					dev.off()
 
-	# 			residual_agg_dt = data.table(type="agg",
-	# 						KS_stat=tmp_test$uniformity$statistic,
-	# 						KS_pvalue=tmp_test$uniformity$p.value,
-	# 						dispersion_stat=tmp_test$dispersion$statistic,
-	# 						dispersion_pvalue=tmp_test$dispersion$p.value,
-	# 						outlier_stat=tmp_test$outliers$statistic,
-	# 						outlier_pvalue=tmp_test$outliers$p.value,
-	# 						zinf_stat=tmp_zinf$statistic,
-	# 						zinf_pvalue=tmp_zinf$p.value,							
-	# 						moran_pvalue=tmp_dharma_sp$p.value,
-	# 						DW_stat=tmp_ar$statistic,
-	# 						DW_pvalue=tmp_ar$p.value,
-	# 						quant_pvalue=tmp_quant$p.value,
-	# 						quant_lon_pvalue=tmp_quant_lon$p.value,
-	# 						quant_lat_pvalue=tmp_quant_lat$p.value)
+				residual_agg_dt = data.table(type="agg",
+							KS_stat=tmp_test$uniformity$statistic,
+							KS_pvalue=tmp_test$uniformity$p.value,
+							dispersion_stat=tmp_test$dispersion$statistic,
+							dispersion_pvalue=tmp_test$dispersion$p.value,
+							outlier_stat=tmp_test$outliers$statistic,
+							outlier_pvalue=tmp_test$outliers$p.value,
+							zinf_stat=tmp_zinf$statistic,
+							zinf_pvalue=tmp_zinf$p.value,							
+							moran_pvalue=tmp_dharma_sp$p.value,
+							DW_stat=tmp_ar$statistic,
+							DW_pvalue=tmp_ar$p.value,
+							quant_pvalue=tmp_quant$p.value,
+							quant_lon_pvalue=tmp_quant_lon$p.value,
+							quant_lat_pvalue=tmp_quant_lat$p.value,
+							quant_depth_pvalue=residual_continuous_vec_pvalue[1],
+							quant_time_pvalue=residual_continuous_vec_pvalue[2],
+							quant_jd_pvalue=residual_continuous_vec_pvalue[3],
+							quant_lunar_phase_pvalue=residual_continuous_vec_pvalue[4])
 
-	# 			# clean-up
-	# 				rm(list=c("tmp_spatial_group_dt","tmp_zinf","tmp_test","tmp_ar","tmp_dharma_sp","tmp_quant","tmp_quant_lon","tmp_quant_lat"))
+				# clean-up
+					rm(list=c("tmp_spatial_group_dt","tmp_zinf","tmp_test","tmp_ar","tmp_dharma_sp","tmp_quant","tmp_quant_lon","tmp_quant_lat"))
 		
-	# # calc residuals by species
+	# calc residuals by species
 	    u_species = unique(bfish_df$species_cd)
 
-	# 	residual_dt.list = as.list(rep(NA,length(u_species)))
+		residual_dt.list = as.list(rep(NA,length(u_species)))
 
-	# 	for(i in 1:length(u_species))
-	# 	{
-	# 		residual_dt.list[[i]] = data.table(type=u_species[i],
-	# 						KS_stat=NA,
-	# 						KS_pvalue=NA,
-	# 						dispersion_stat=NA,
-	# 						dispersion_pvalue=NA,
-	# 						outlier_stat=NA,
-	# 						outlier_pvalue=NA,
-	# 						zinf_stat=NA,
-	# 						zinf_pvalue=NA,							
-	# 						moran_pvalue=NA,
-	# 						DW_stat=NA,
-	# 						DW_pvalue=NA)
+		for(i in 1:length(u_species))
+		{
+			residual_dt.list[[i]] = data.table(type=u_species[i],
+							KS_stat=NA,
+							KS_pvalue=NA,
+							dispersion_stat=NA,
+							dispersion_pvalue=NA,
+							outlier_stat=NA,
+							outlier_pvalue=NA,
+							zinf_stat=NA,
+							zinf_pvalue=NA,							
+							moran_pvalue=NA,
+							DW_stat=NA,
+							DW_pvalue=NA)
 
-	# 		tmp_idx = which(bfish_df$species_cd == u_species[i])
-	# 		tmp_bfish = bfish_df[tmp_idx,]
-	# 		tmp_residuals = residuals_dharma
-	# 		tmp_residuals$simulatedResponse = tmp_residuals$simulatedResponse[tmp_idx,]
-	# 		tmp_residuals$observedResponse = tmp_residuals$observedResponse[tmp_idx]
-	# 		tmp_residuals$nObs = length(tmp_idx)
-	# 		tmp_residuals$scaledResiduals = tmp_residuals$scaledResiduals[tmp_idx]
-	# 		tmp_residuals$fittedPredictedResponse = tmp_residuals$fittedPredictedResponse[tmp_idx]
+			tmp_idx = which(bfish_df$species_cd == u_species[i])
+			tmp_bfish = bfish_df[tmp_idx,]
+			tmp_residuals = residuals_dharma
+			tmp_residuals$simulatedResponse = tmp_residuals$simulatedResponse[tmp_idx,]
+			tmp_residuals$observedResponse = tmp_residuals$observedResponse[tmp_idx]
+			tmp_residuals$nObs = length(tmp_idx)
+			tmp_residuals$scaledResiduals = tmp_residuals$scaledResiduals[tmp_idx]
+			tmp_residuals$fittedPredictedResponse = tmp_residuals$fittedPredictedResponse[tmp_idx]
 
-	# 		# basic QQ & residual v. predicted plot
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_qq.png"),width = 16, height = 9, units = "in",res=300)
-	# 					plot(tmp_residuals)
-	# 				dev.off()
-	# 			# quantile test: residual v. predicted by model covariate
-	# 				png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant = DHARMa::testQuantiles(tmp_residuals)
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_year.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_year = DHARMa::testQuantiles(tmp_residuals,predictor=as.factor(tmp_bfish$year))
-	# 					DHARMa::plotResiduals(tmp_residuals, form = as.factor(tmp_bfish$year))
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_lon = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish$lon)
-	# 				dev.off()
-	# 				png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_lat = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish$lat)
-	# 				dev.off()
-    #                 png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_gear.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_quant_gear = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish$gear_type)
-	# 				dev.off()
-	# 			# test for uniformity in residuals, overdispersion, outliers
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
-	# 					tmp_test = DHARMa::testResiduals(tmp_residuals)
-	# 				dev.off()
-	# 			# test for zero inflation
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_zi.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_zinf = DHARMa::testZeroInflation(tmp_residuals)
-	# 				dev.off()
-	# 			# test for over-dispersion
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_od.png"),width = 9, height = 9, units = "in",res=300)
-	# 					DHARMa::testDispersion(tmp_residuals,alternative="two.sided")
-	# 				dev.off()
-	# 			# test for spatial autocorrelation
-	# 			# DHARMa::testSpatialAutocorrelation needs unique locations
-	# 				tmp_bfish$spatial_group = as.numeric(as.factor(paste0(tmp_bfish$lon,"_",tmp_bfish$lat)))
-	# 				tmp_spatial_group_dt = data.table(spatial_group=tmp_bfish$spatial_group,x=tmp_bfish$lon,y=tmp_bfish$lat) %>%
-	# 							   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
-	# 				tmp_residuals_spatial_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$spatial_group)	
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
-	# 					tmp_dharma_sp = DHARMa::testSpatialAutocorrelation(tmp_residuals_spatial_group, x = tmp_spatial_group_dt$x, y = tmp_spatial_group_dt$y)
-	# 					text(min(tmp_spatial_group_dt$x),min(tmp_spatial_group_dt$y),paste0("Moran's I p-value: ",round(tmp_dharma_sp$p.value,digits=2)),adj=c(0,0))
-	# 				dev.off()
-	# 			# test for temporal autocorrelation
-	# 				tmp_bfish$temporal_group = factor(tmp_bfish$year,levels=as.character(sort(unique(tmp_bfish$year))))
-	# 				tmp_residuals_temporal_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$temporal_group)	
-	# 			 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
-	# 					tmp_ar = DHARMa::testTemporalAutocorrelation(tmp_residuals_temporal_group, time=levels(tmp_bfish$temporal_group))
-	# 				dev.off()
+			# basic QQ & residual v. predicted plot
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_qq.png"),width = 16, height = 9, units = "in",res=300)
+						plot(tmp_residuals)
+					dev.off()
+				# quantile test: residual v. predicted by model covariate
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant = DHARMa::testQuantiles(tmp_residuals)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_year.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_year = DHARMa::testQuantiles(tmp_residuals,predictor=as.factor(tmp_bfish$year))
+						DHARMa::plotResiduals(tmp_residuals, form = as.factor(tmp_bfish$year))
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_lon.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_lon = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish$lon)
+					dev.off()
+					png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_lat.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_lat = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish$lat)
+					dev.off()
+                    png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_gear.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_quant_gear = DHARMa::testQuantiles(tmp_residuals,predictor=as.factor(tmp_bfish$gear_type))
+					dev.off()
+					for(v in 1:length(residual_factor_vec))
+					{
+                    	png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_",residual_factor_vec[v],".png"),width = 9, height = 9, units = "in",res=300)
+							tmp_quant_factor = DHARMa::testQuantiles(tmp_residuals,predictor=as.factor(as.character(tmp_bfish[,residual_factor_vec[v]])))
+						dev.off()
+					}
+					tmp_continuous_vec_pvalue = rep(NA,length(residual_continuous_vec))
+					for(v in 1:length(residual_continuous_vec))
+					{
+                    	png(filename = paste0(working_dir,"dharma_",u_species[i],"_quant_resid_",residual_continuous_vec[v],".png"),width = 9, height = 9, units = "in",res=300)
+							tmp_quant_continuous = DHARMa::testQuantiles(tmp_residuals,predictor=tmp_bfish[,residual_continuous_vec[v]])
+						dev.off()
+						tmp_continuous_vec_pvalue[v] = tmp_quant_continuous$p.value
+						rm(list=c("tmp_quant_continuous"))
+					}
+				# test for uniformity in residuals, overdispersion, outliers
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_residual_tests.png"),width = 16, height = 9, units = "in",res=300)
+						tmp_test = DHARMa::testResiduals(tmp_residuals)
+					dev.off()
+				# test for zero inflation
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_zi.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_zinf = DHARMa::testZeroInflation(tmp_residuals)
+					dev.off()
+				# test for over-dispersion
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_od.png"),width = 9, height = 9, units = "in",res=300)
+						DHARMa::testDispersion(tmp_residuals,alternative="two.sided")
+					dev.off()
+				# test for spatial autocorrelation
+				# DHARMa::testSpatialAutocorrelation needs unique locations
+					tmp_bfish$spatial_group = as.numeric(as.factor(paste0(tmp_bfish$lon,"_",tmp_bfish$lat)))
+					tmp_spatial_group_dt = data.table(spatial_group=tmp_bfish$spatial_group,x=tmp_bfish$lon,y=tmp_bfish$lat) %>%
+								   .[,.(x=mean(x),y=mean(y)),by=spatial_group]
+					tmp_residuals_spatial_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$spatial_group)	
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_spcorr.png"),width = 9, height = 9, units = "in",res=300)
+						tmp_dharma_sp = DHARMa::testSpatialAutocorrelation(tmp_residuals_spatial_group, x = tmp_spatial_group_dt$x, y = tmp_spatial_group_dt$y)
+						text(min(tmp_spatial_group_dt$x),min(tmp_spatial_group_dt$y),paste0("Moran's I p-value: ",round(tmp_dharma_sp$p.value,digits=2)),adj=c(0,0))
+					dev.off()
+				# test for temporal autocorrelation
+					tmp_bfish$temporal_group = factor(tmp_bfish$year,levels=as.character(sort(unique(tmp_bfish$year))))
+					tmp_residuals_temporal_group = DHARMa::recalculateResiduals(tmp_residuals, group = tmp_bfish$temporal_group)	
+				 	png(filename = paste0(working_dir,"dharma_",u_species[i],"_test_tcorr.png"),width = 9, height = 9, units = "in",res=300)		
+						tmp_ar = DHARMa::testTemporalAutocorrelation(tmp_residuals_temporal_group, time=levels(tmp_bfish$temporal_group))
+					dev.off()
 
 
-	# 			residual_dt.list[[i]]$KS_stat=tmp_test$uniformity$statistic
-	# 			residual_dt.list[[i]]$KS_pvalue=tmp_test$uniformity$p.value
-	# 			residual_dt.list[[i]]$dispersion_stat=tmp_test$dispersion$statistic
-	# 			residual_dt.list[[i]]$dispersion_pvalue=tmp_test$dispersion$p.value
-	# 			residual_dt.list[[i]]$outlier_stat=tmp_test$outliers$statistic
-	# 			residual_dt.list[[i]]$outlier_pvalue=tmp_test$outliers$p.value
-	# 			residual_dt.list[[i]]$zinf_stat=tmp_zinf$statistic
-	# 			residual_dt.list[[i]]$zinf_pvalue=tmp_zinf$p.value				
-	# 			residual_dt.list[[i]]$moran_pvalue=tmp_dharma_sp$p.value
-	# 			residual_dt.list[[i]]$DW_stat=tmp_ar$statistic
-	# 			residual_dt.list[[i]]$DW_pvalue=tmp_ar$p.value
-	# 			residual_dt.list[[i]]$quant_pvalue=tmp_quant$p.value
-	# 			residual_dt.list[[i]]$quant_lon_pvalue=tmp_quant_lon$p.value
-	# 			residual_dt.list[[i]]$quant_lat_pvalue=tmp_quant_lat$p.value
+				residual_dt.list[[i]]$KS_stat=tmp_test$uniformity$statistic
+				residual_dt.list[[i]]$KS_pvalue=tmp_test$uniformity$p.value
+				residual_dt.list[[i]]$dispersion_stat=tmp_test$dispersion$statistic
+				residual_dt.list[[i]]$dispersion_pvalue=tmp_test$dispersion$p.value
+				residual_dt.list[[i]]$outlier_stat=tmp_test$outliers$statistic
+				residual_dt.list[[i]]$outlier_pvalue=tmp_test$outliers$p.value
+				residual_dt.list[[i]]$zinf_stat=tmp_zinf$statistic
+				residual_dt.list[[i]]$zinf_pvalue=tmp_zinf$p.value				
+				residual_dt.list[[i]]$moran_pvalue=tmp_dharma_sp$p.value
+				residual_dt.list[[i]]$DW_stat=tmp_ar$statistic
+				residual_dt.list[[i]]$DW_pvalue=tmp_ar$p.value
+				residual_dt.list[[i]]$quant_pvalue=tmp_quant$p.value
+				residual_dt.list[[i]]$quant_lon_pvalue=tmp_quant_lon$p.value
+				residual_dt.list[[i]]$quant_lat_pvalue=tmp_quant_lat$p.value
+				residual_dt.list[[i]]$quant_depth_pvalue=tmp_continuous_vec_pvalue[1]
+				residual_dt.list[[i]]$quant_time_pvalue=tmp_continuous_vec_pvalue[2]
+				residual_dt.list[[i]]$quant_jd_pvalue=tmp_continuous_vec_pvalue[3]
+				residual_dt.list[[i]]$quant_lunar_pvalue=tmp_continuous_vec_pvalue[4]
 
-	# 			# clean-up
-	# 				rm(list=c("tmp_zinf","tmp_test","tmp_ar","tmp_idx","tmp_bfish","tmp_residuals","tmp_spatial_group_dt","tmp_dharma_sp","tmp_residuals_spatial_group","tmp_residuals_temporal_group","tmp_quant","tmp_quant_lon","tmp_quant_lat"))
-	# 	}
+				# clean-up
+					rm(list=c("tmp_zinf","tmp_test","tmp_ar","tmp_idx","tmp_bfish","tmp_residuals","tmp_spatial_group_dt","tmp_dharma_sp","tmp_residuals_spatial_group","tmp_residuals_temporal_group","tmp_quant","tmp_quant_lon","tmp_quant_lat","tmp_continuous_vec_pvalue"))
+		}
 		
-	# 	residual_dt = rbind(residual_agg_dt,rbindlist(residual_dt.list))
-	# 	fwrite(residual_dt,file=paste0(working_dir,"residual_dt.csv"))
-	# 	gc()
+		residual_dt = rbind(residual_agg_dt,rbindlist(residual_dt.list))
+		fwrite(residual_dt,file=paste0(working_dir,"residual_dt.csv"))
+		gc()
 #_____________________________________________________________________________________________________________________________
 # 5) Make plots
 # predicted density
@@ -1488,15 +1536,19 @@
         }
     
     # plot abundance covariates
-            abundance_effect_dt.list = as.list(rep(NA,length(continuous_ab_variables)))
+			ab_df_plot = ab_df
+			ab_df_plot = ab_df_plot[,-which(colnames(ab_df_plot)%in%c("depth_sc","complexity_sc","hardness_sc"))]
+			colnames(ab_df_plot)[which(colnames(ab_df_plot)%in%c("depth","complexity","hardness"))] = paste0(colnames(ab_df_plot)[which(colnames(ab_df_plot)%in%c("depth","complexity","hardness"))],"_sc")
+          
+		    abundance_effect_dt.list = as.list(rep(NA,length(continuous_ab_variables)))
             for(i in 1:length(continuous_ab_variables))
             {
                 abundance_effect_dt.list[[i]] = as.list(rep(NA,length(target_species)))
                 tmp_cols = continuous_ab_variables[i]
                 for(s in 1:length(target_species))
                 {
-                    abundance_effect_dt.list[[i]][[s]] = as.data.table(ab_df) %>%
-                    .[,..tmp_cols] %>%
+                    abundance_effect_dt.list[[i]][[s]] = as.data.table(ab_df_plot) %>%
+					.[,..tmp_cols] %>%
                     .[,value:=fit$data_list$X1_gctp[,s,1,grep(continuous_ab_variables[i],dimnames(fit$data_list$X1_gctp)[[4]])] %*% t(t(fit$ParHat$gamma1_cp[s,grep(continuous_ab_variables[i],dimnames(fit$data_list$X1_gctp)[[4]])]))] %>%
                     .[,species_cd:=target_species[s]] %>%
                     setnames(.,tmp_cols,"variable") %>%
@@ -1541,18 +1593,23 @@
         	load(file=paste0(load_xval_path,k,"_xval_train_df.RData"))
         	load(file=paste0(load_xval_path,k,"_xval_test_df.RData"))
 
-			if(target_species != "mv")
+			if(length(target_species) == 1)
 			{
 				tmp_weight_kg = xval_train_df[,target_species]
 				xval_train_df$weight_kg = tmp_weight_kg
 				xval_train_df$species_cd = target_species
 				rm(list="tmp_weight_kg")
 			}
-			
+
+			train_q_data = xval_train_df[,c("year","species_cd","gear_type")]
+			colnames(train_q_data)[2] = "category"
+			train_q_data$category = factor(train_q_data[,'category'],levels=c(target_species))
+			train_q_data$gear_type = factor(train_q_data[,'gear_type'])
+				
 			xval_working_dir = paste0(working_dir,"xval/",k,"/")
 			dir.create(xval_working_dir,recursive = TRUE)
 
-			xval_fit = fit_model( settings=settings,
+			xval_fit = try(fit_model( settings=settings,
  				   				Lon_i=xval_train_df$lon,
     			   				Lat_i=xval_train_df$lat,
           						t_i=as.integer(xval_train_df$year),
@@ -1560,15 +1617,39 @@
           						a_i=rep(pi * (0.02760333457^2),nrow(xval_train_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
 	    	  					c_i = as.numeric(factor(xval_train_df[,'species_cd'],levels=c(target_species)))-1,
 	    	  					category_names=c(target_species),
-	    	  					covariate_data = NULL,
-	    	  					catchability_data = NULL,
+	    	  					covariate_data = ab_df,
+	    	  					catchability_data = train_q_data,
           						working_dir = xval_working_dir,
           						newtonsteps = 1,
+								X1_formula = ab1_formula,
+								X2_formula = ab2_formula,
+                                Q1_formula = q1_formula,
+                                Q2_formula = q2_formula,
+								Map = modified_map,
+    	  						Parameters = modified_parameters,
           						# extrapolation list args
           						extrapolation_list = xval_extrapolation_list,
           						# spatial list args
     	  						spatial_list = xval_spatial_list,
-    	  						test_fit=TRUE)
+    	  						test_fit=FALSE),silent=TRUE)
+			
+			if(class(xval_fit) == "try-error")
+			{
+				rm(list=c("xval_fit"))
+			}
+			
+			if("xval_fit" %in% ls())
+			{
+				if(length(xval_fit$parameter_estimates)==2)
+				{
+					rm(list=c("xval_fit"))
+				} else {
+					if(xval_fit$parameter_estimates$Convergence_check != "There is no evidence that the model is not converged")
+					{
+						rm(list=c("xval_fit"))
+					}
+				}
+			} 
 			
 			if("xval_fit" %in% ls())
 			{
@@ -1618,13 +1699,13 @@
 				  					  .[,.(partition,model_sampling_unit,year,lon,lat,species_cd,weight_kg,pred_weight_kg)]
 
 
-				  rm(list=c("xval_predict_working_dir","xval_predict"))
+				  rm(list=c("xval_fit","xval_predict_working_dir","xval_predict"))
 				  gc();
 
 			}
 
 			# clean-up
-        	rm(list=c("xval_fit","xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
+        	rm(list=c("xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
 			gc();
 		}
 

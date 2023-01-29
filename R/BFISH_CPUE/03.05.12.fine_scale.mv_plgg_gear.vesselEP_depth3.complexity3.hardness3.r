@@ -22,7 +22,7 @@
 #_____________________________________________________________________________________________________________________________
 # specify (coarse) model configuration
     data_flag = 2021
-    link_function = "pldg" # poisson-link delta-gamma
+    link_function = "plgg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
     catchability_covariates = "gear.vesselEP" # vanilla
@@ -291,6 +291,12 @@
     if(link_function == "pldg")
     {
         obs_model = c(2,4)
+    } else if(link_function == "lgdg"){
+        obs_model = c(2,3)
+    } else if(link_function == "pldl"){
+        obs_model = c(4,4)
+    } else if(link_function == "plgg"){
+        obs_model = c(9,4)
     }
 
 	# make settings
@@ -349,8 +355,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,NA,4,5,6)
+			epsilon2_map = c(NA,1,2,3,NA,5,6)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
@@ -373,8 +379,8 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,NA,4,5,6)
+			epsilon2_map = c(NA,1,2,3,NA,5,6)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))

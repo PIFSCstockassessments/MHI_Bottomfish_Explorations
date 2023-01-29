@@ -22,10 +22,10 @@
 #_____________________________________________________________________________________________________________________________
 # specify (coarse) model configuration
     data_flag = 2021
-    link_function = "pldg" # poisson-link delta-gamma
+    link_function = "plgg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gear.vesselEP" # vanilla
+    catchability_covariates = "gearSP.vesselEP" # vanilla
     abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type
-        q2_formula = ~ gear_type
+        q1_formula = ~ category:gear_type
+        q2_formula = ~ category:gear_type
 
         continuous_q_variables = c()
 
@@ -291,6 +291,12 @@
     if(link_function == "pldg")
     {
         obs_model = c(2,4)
+    } else if(link_function == "lgdg"){
+        obs_model = c(2,3)
+    } else if(link_function == "pldl"){
+        obs_model = c(4,4)
+    } else if(link_function == "plgg"){
+        obs_model = c(9,4)
     }
 
 	# make settings
@@ -345,22 +351,30 @@
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])>1.5e1)
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])>1.5e1)
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,4,5,6,7)
+			epsilon2_map = c(1,2,3,4,5,6,7)
+			eta1_map = c(1,2,3,4,5,6,7)
+			eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
+			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
 
 			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
 			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
 
 		} else {
 			fit_setup$parameter_estimates
@@ -369,22 +383,31 @@
 			which(abs(fit_setup$ParHat$L_epsilon1_z)<1e-3|abs(fit_setup$ParHat$L_epsilon1_z)>1.5e1)
 			which(abs(fit_setup$ParHat$L_omega2_z)<1e-3|abs(fit_setup$ParHat$L_omega2_z)>1.5e1)
 			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-3|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_eta1_z)<1e-3|abs(fit_setup$ParHat$L_eta1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_eta2_z)<1e-3|abs(fit_setup$ParHat$L_eta2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			omega2_map = c(1,2,3,4,5,6,7)
+			epsilon2_map = c(1,2,3,4,5,6,7)
+			eta1_map = c(1,2,3,4,5,6,7)
+			eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
+			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
 
-			modified_parameters = fit_setup$ParHat
+			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
 			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
+
 		}
 
 		fit = fit_model( settings=settings,
@@ -802,7 +825,7 @@
             melt(.,id.vars="vessel") %>%
             setnames(.,c("variable","value"),c("species","eta1")) %>%
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            .[order(species,vessel)] 
+            .[order(species,vessel)]
 
             eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
             .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
@@ -812,7 +835,7 @@
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
             .[order(species,vessel)]
             
-			eta_dt = merge(eta1_dt,eta2_dt) %>%
+			eta_dt = rbind(eta1_dt,eta2_dt) %>%
                       melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
@@ -1558,7 +1581,7 @@
 						dpi = 300, limitsize = TRUE)
 
         }
-    
+
     # plot abundance covariates
 			ab_df_plot = ab_df
 			ab_df_plot = ab_df_plot[,-which(colnames(ab_df_plot)%in%c("depth_sc","complexity_sc","hardness_sc"))]
