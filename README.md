@@ -1,4 +1,4 @@
-# MHI_Bottomfish_2023 - Exploratory
+# MHI_Bottomfish_2023
 Repository for exploratory analyses in preparation for the Main Hawaiian Islands Deep 7 Bottomfish Stock Assessment. Final code used in the assessment are in the repository named "Deep-7-Benchmark-2024."
 
 ### Data Exploration
