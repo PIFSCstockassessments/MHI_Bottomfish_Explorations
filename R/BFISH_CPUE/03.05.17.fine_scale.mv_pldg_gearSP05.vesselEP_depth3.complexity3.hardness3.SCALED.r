@@ -22,10 +22,10 @@
 #_____________________________________________________________________________________________________________________________
 # specify (coarse) model configuration
     data_flag = 2021
-    link_function = "plgg" # poisson-link delta-gamma
+    link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gear.vesselEP" # vanilla
+    catchability_covariates = "gearSP05.vesselEP" # vanilla
     abundance_covariates = "depth3.complexity3.hardness3.SCALED" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -58,7 +58,7 @@
 
     load_spatial_path = paste0(proj.dir,"VAST/model_runs/2023-01-05/2021_pldg_mv_05_gearSP_v_TRUE_7.5_TRUE_TRUE_pit_noxval/")
 	# xval path
-    # load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_single_05_TRUE_7.5_FALSE_10_123/")
+    load_xval_path = paste0(proj.dir,"VAST/xval_data/2021_mv_05_TRUE_7.5_FALSE_10_123/")
 
 #_____________________________________________________________________________________________________________________________
 # 1) bring in data
@@ -85,8 +85,8 @@
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 
-        q1_formula = ~ gear_type
-        q2_formula = ~ gear_type
+        q1_formula = ~ gear_type:category
+        q2_formula = ~ gear_type:category
 
         continuous_q_variables = c()
 
@@ -343,7 +343,7 @@
 		# turn off estimation of components if poorly estimated
         # are mean estimates for L_ components going to zero
         # or are any variances blowing up
-				if(length(fit_setup$parameter_estimates)==2)
+		if(length(fit_setup$parameter_estimates)==2)
 		{
 			fit_setup$parameter_estimates$opt
 			# suggestions for problematic parameters
@@ -357,25 +357,28 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,5,6)
-			epsilon2_map = c(NA,1,2,3,NA,5,6)
-			eta1_map = c(1,2,3,4,5,6,7)
-			eta2_map = c(1,2,3,4,5,6,7)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			# eta1_map = c(1,2,3,4,5,6,7)
+			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
-			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
-			modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+            # modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
+			modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
 
 			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
 			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
-			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
-			modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
-
+			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
+			modified_parameters$lambda1_k[5:7] = 0
+			modified_parameters$lambda2_k[5:7] = 0
 		} else {
 			fit_setup$parameter_estimates
 			# suggestions for problematic parameters
@@ -389,26 +392,132 @@
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,NA,4,5,6)
-			epsilon2_map = c(NA,1,2,3,NA,5,6)
-			eta1_map = c(1,2,3,4,5,6,7)
-			eta2_map = c(1,2,3,4,5,6,7)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			# eta1_map = c(1,2,3,4,5,6,7)
+			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
-			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
-			modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			# modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
+			modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
 
 			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
 			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
-			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
-			modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
-
+			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
+			modified_parameters$lambda1_k[5:7] = 0
+			modified_parameters$lambda2_k[5:7] = 0
 		}
+		rm(list="fit_setup"); gc()
+
+		# re-run with grouped lambda1 & lambda2
+		fit_setup = fit_model( settings=settings,
+ 				   				Lon_i=bfish_df$lon,
+    			   				Lat_i=bfish_df$lat,
+          						t_i=as.integer(bfish_df$year),
+          						b_i=bfish_df$weight_kg,
+          						a_i=rep(pi * (0.02760333457^2),nrow(bfish_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
+	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c(target_species)))-1,
+	    	  					v_i = as.numeric(factor(bfish_df[,'platform']))-1,
+								category_names=c(target_species),
+	    	  					covariate_data = ab_df,
+								X1_formula = ab1_formula,
+								X2_formula = ab2_formula,
+	    	  					catchability_data = q_data,
+                                Q1_formula = q1_formula,
+                                Q2_formula = q2_formula,
+          						working_dir = paste0(working_dir,"setup/"),
+          						newtonsteps = 0,
+          						# extrapolation list args
+          						projargs=slot(crs_eqd,"projargs"),input_grid=input_grid,
+          						extrapolation_list = Extrapolation_List,
+          						# spatial list args
+    	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
+    	  						spatial_list = spatial_list,
+								Map = modified_map,
+    	  						Parameters = modified_parameters,
+								build_model=TRUE,test_fit=FALSE); gc()
+
+		if(length(fit_setup$parameter_estimates)==2)
+		{
+			fit_setup$parameter_estimates$opt
+			# suggestions for problematic parameters
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])>1.5e1)
+
+			modified_map = fit_setup$tmb_list$Map
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			# eta1_map = c(1,2,3,4,5,6,7)
+			# eta2_map = c(1,2,3,4,5,6,7)
+			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
+			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
+			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
+			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
+			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+            # modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
+			modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
+
+			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
+			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
+			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
+			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
+			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
+			modified_parameters$lambda1_k[5:7] = 0
+			modified_parameters$lambda2_k[5:7] = 0
+		} else {
+			fit_setup$parameter_estimates
+			# suggestions for problematic parameters
+			which(abs(fit_setup$ParHat$L_omega1_z)<1e-3|abs(fit_setup$ParHat$L_omega1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_epsilon1_z)<1e-3|abs(fit_setup$ParHat$L_epsilon1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_omega2_z)<1e-3|abs(fit_setup$ParHat$L_omega2_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-3|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_eta1_z)<1e-3|abs(fit_setup$ParHat$L_eta1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_eta2_z)<1e-3|abs(fit_setup$ParHat$L_eta2_z)>1.5e1)
+
+			modified_map = fit_setup$tmb_list$Map
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega2_map = c(1,2,3,NA,4,NA,5)
+			epsilon2_map = c(1,2,3,4,5,NA,NA)
+			# eta1_map = c(1,2,3,4,5,6,7)
+			# eta2_map = c(1,2,3,4,5,6,7)
+			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
+			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
+			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
+			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
+			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			# modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
+			modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
+			modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
+
+			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
+			modified_parameters$L_omega1_z[which(is.na(omega1_map))] = 1e-8
+			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
+			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
+			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
+			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
+			modified_parameters$lambda1_k[5:7] = 0
+			modified_parameters$lambda2_k[5:7] = 0
+		}
+
 		fit = fit_model( settings=settings,
  				   				Lon_i=bfish_df$lon,
     			   				Lat_i=bfish_df$lat,
@@ -824,7 +933,7 @@
             melt(.,id.vars="vessel") %>%
             setnames(.,c("variable","value"),c("species","eta1")) %>%
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
-            .[order(species,vessel)] 
+            .[order(species,vessel)]
 
             eta2_dt = as.data.table(fit$Report$eta2_vc) %>% 
             .[,vessel:=levels(factor(bfish_df[,'platform']))] %>%
@@ -834,7 +943,7 @@
 			.[,species:=factor(as.character(species),levels=paste0("V",1:7),labels=c("prfi","etca","etco","prsi","przo","hyqu","apru"))] %>%
             .[order(species,vessel)]
             
-			eta_dt = merge(eta1_dt,eta2_dt) %>%
+			eta_dt = rbind(eta1_dt,eta2_dt) %>%
                       melt(.,id.vars=c("species","vessel"))
 
 			omega1_dt = as.data.table(fit$Report$Omega1_gc) %>%
@@ -1580,7 +1689,7 @@
 						dpi = 300, limitsize = TRUE)
 
         }
-    
+
     # plot abundance covariates
 			ab_df_plot = ab_df
 			ab_df_plot = ab_df_plot[,-which(colnames(ab_df_plot)%in%c("depth_sc","complexity_sc","hardness_sc"))]
@@ -1639,18 +1748,23 @@
         	load(file=paste0(load_xval_path,k,"_xval_train_df.RData"))
         	load(file=paste0(load_xval_path,k,"_xval_test_df.RData"))
 
-			if(target_species != "mv")
+			if(length(target_species) == 1)
 			{
 				tmp_weight_kg = xval_train_df[,target_species]
 				xval_train_df$weight_kg = tmp_weight_kg
 				xval_train_df$species_cd = target_species
 				rm(list="tmp_weight_kg")
 			}
-			
+
+			train_q_data = xval_train_df[,c("year","species_cd","gear_type")]
+			colnames(train_q_data)[2] = "category"
+			train_q_data$category = factor(train_q_data[,'category'],levels=c(target_species))
+			train_q_data$gear_type = factor(train_q_data[,'gear_type'])
+				
 			xval_working_dir = paste0(working_dir,"xval/",k,"/")
 			dir.create(xval_working_dir,recursive = TRUE)
 
-			xval_fit = fit_model( settings=settings,
+			xval_fit = try(fit_model( settings=settings,
  				   				Lon_i=xval_train_df$lon,
     			   				Lat_i=xval_train_df$lat,
           						t_i=as.integer(xval_train_df$year),
@@ -1658,15 +1772,39 @@
           						a_i=rep(pi * (0.02760333457^2),nrow(xval_train_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
 	    	  					c_i = as.numeric(factor(xval_train_df[,'species_cd'],levels=c(target_species)))-1,
 	    	  					category_names=c(target_species),
-	    	  					covariate_data = NULL,
-	    	  					catchability_data = NULL,
+	    	  					covariate_data = ab_df,
+	    	  					catchability_data = train_q_data,
           						working_dir = xval_working_dir,
           						newtonsteps = 1,
+								X1_formula = ab1_formula,
+								X2_formula = ab2_formula,
+                                Q1_formula = q1_formula,
+                                Q2_formula = q2_formula,
+								Map = modified_map,
+    	  						Parameters = modified_parameters,
           						# extrapolation list args
           						extrapolation_list = xval_extrapolation_list,
           						# spatial list args
     	  						spatial_list = xval_spatial_list,
-    	  						test_fit=TRUE)
+    	  						test_fit=FALSE),silent=TRUE)
+			
+			if(class(xval_fit) == "try-error")
+			{
+				rm(list=c("xval_fit"))
+			}
+			
+			if("xval_fit" %in% ls())
+			{
+				if(length(xval_fit$parameter_estimates)==2)
+				{
+					rm(list=c("xval_fit"))
+				} else {
+					if(xval_fit$parameter_estimates$Convergence_check != "There is no evidence that the model is not converged")
+					{
+						rm(list=c("xval_fit"))
+					}
+				}
+			} 
 			
 			if("xval_fit" %in% ls())
 			{
@@ -1716,13 +1854,13 @@
 				  					  .[,.(partition,model_sampling_unit,year,lon,lat,species_cd,weight_kg,pred_weight_kg)]
 
 
-				  rm(list=c("xval_predict_working_dir","xval_predict"))
+				  rm(list=c("xval_fit","xval_predict_working_dir","xval_predict"))
 				  gc();
 
 			}
 
 			# clean-up
-        	rm(list=c("xval_fit","xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
+        	rm(list=c("xval_working_dir","xval_extrapolation_list","xval_spatial_list","xval_train_df","xval_test_df"))
 			gc();
 		}
 
