@@ -19,6 +19,8 @@
 			if(is.na(x))
 			{
 				time=NA
+			} else if (nchar(x)==1){
+				time=as.numeric(x)
 			} else if (nchar(x)==3){
 				hour = 0
 				min = as.numeric(substr(x,1,1))/60
