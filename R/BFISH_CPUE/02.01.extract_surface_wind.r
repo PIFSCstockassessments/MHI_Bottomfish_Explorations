@@ -1,10 +1,10 @@
 
 
 # Nicholas Ducharme-Barth
-# 09/23/2022
+# 2023/06/01
 # Match BFISH to PacIOOS surface wind data
 # Code is heavily influenced by John Syslo's code 'matching_windu_psu.R' and 'prep wind for r.R'
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #_____________________________________________________________________________________________________________________________
@@ -20,7 +20,7 @@
 # set working directory
 	proj.dir = "D:/HOME/SAP/2024_Deep7/"
 
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2022
 #_____________________________________________________________________________________________________________________________
 # 1) bring in bfsish sampling data
 	load(file=paste0(proj.dir,"Data/",data_flag,"02.bfish_combined_long_dt.RData"))
@@ -41,7 +41,7 @@
 #_____________________________________________________________________________________________________________________________
 # 2) iterate across years and match with wind
 # match based on closest spatial (lon/lat) and temporal (time) wind value
-# time is hours since 2010-05-14 00-00-00.000 UTC for PacIOOS data
+# time is hours since 2010-05-14 12-00-00 UTC for PacIOOS data
 # wind velocity by component (u and v) at 10m altitude and given in m/s
 # https://www.pacioos.hawaii.edu/weather/model-wind-hawaii/#about
 # https://www.eol.ucar.edu/content/wind-direction-quick-reference
@@ -83,7 +83,7 @@
 					.[,speed_ms:=sqrt(wind_u^2+wind_v^2 )]	%>%
 					.[,speed_kt:=speed_ms*1.943844] %>%
 					.[,direction:=(270-atan2(wind_v,wind_u)*180/pi) %% 360 ] %>%		
-					.[,time_utc:=as.POSIXct(time_utc*60*60, origin = "2010-05-14", tz = "UTC")] %>%
+					.[,time_utc:=as.POSIXct(time_utc*60*60, origin = "2010-05-14 12:00:00", tz = "UTC")] %>%
 					.[,time_hst:=as.POSIXct(format(time_utc, tz="HST",usetz=TRUE))] %>%
 			  		.[,isodate:=as.numeric(format(time_hst,format="%Y%m%d"))] %>%
 					.[,time:=as.numeric(as.character(format(time_hst,format="%H")))] %>%
@@ -148,12 +148,12 @@
 	B-A
 
 	sample_wind_dt = rbindlist(sample_wind_dt.list)
-	save(sample_wind_dt,file=paste0(proj.dir,"Data/sample_wind_dt.RData"))
+	save(sample_wind_dt,file=paste0(proj.dir,"Data/",data_flag,"sample_wind_dt.RData"))
 
 
 #_____________________________________________________________________________________________________________________________
 # 3) make some summary plots
-	load(file=paste0(proj.dir,"Data/sample_wind_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"sample_wind_dt.RData"))
 	plot_dir = paste0(proj.dir,"Plot/BFISH_CPUE/")
 
 	wind_plot_dt = merge(bfish_combined_long_dt,sample_wind_dt[,.(design_sampling_unit,speed_ms,speed_kt,speed_mph,beaufort,direction,direction_d)],by="design_sampling_unit")
@@ -175,7 +175,7 @@
      	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
 			
-		ggsave(filename=paste0("wind_encounter_species.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_encounter_species.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -194,7 +194,7 @@
 		theme_few(base_size=20) +
      	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
-		ggsave(filename=paste0("wind_encounter.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_encounter.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -214,7 +214,7 @@
 		theme_few(base_size=20) +
      	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
-		ggsave(filename=paste0("wind_encounter_island.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_encounter_island.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -234,7 +234,7 @@
 		theme_few(base_size=20) +
      	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
-		ggsave(filename=paste0("wind_poscatch.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_poscatch.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -255,7 +255,7 @@
 		theme_few(base_size=20) +
      	viridis::scale_color_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) + 
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
-		ggsave(filename=paste0("wind_poscatch_island.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_poscatch_island.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -271,7 +271,7 @@
 		geom_boxplot(aes(x=time_floor,y=speed_kt,fill=gear_type)) +
 		theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Gear\ntype",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)		
-		ggsave(filename=paste0("wind_time.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_time.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -284,7 +284,7 @@
 		geom_point(aes(x=lon,y=lat,fill=speed_kt),shape=21,size=2) +
 		theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Wind\nspeed (kt)",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=FALSE)		
-		ggsave(filename=paste0("wind_lonlat.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_lonlat.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -301,7 +301,7 @@
 		geom_point(aes(x=jitter(obs_wind,factor=2),y=speed_kt,fill=time),shape=21,size=3) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Time\nof day\n(24 h)",begin = 0.1,end = 0.8,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_pacioos_v_obs.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_pacioos_v_obs.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -318,7 +318,7 @@
 		geom_point(aes(x=jitter(obs_wind,factor=2),y=speed_kt,fill=direction_d),shape=21,size=3) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Direction",begin = 0.1,end = 0.8,discrete=TRUE,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_pacioos_v_obs_direction.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_pacioos_v_obs_direction.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -338,7 +338,7 @@
 		geom_point(aes(x=lon,y=lat,fill=diff,size=N),shape=21) +
 		theme_few(base_size=20) +
  		scale_fill_gradient2("Difference\nPacIOOS\nv.\n'observed'",low = "blue",mid = "white",high = "red")
-		ggsave(filename=paste0("wind_rf_agg_wind_spatial_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_agg_wind_spatial_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -355,7 +355,7 @@
 		geom_point(aes(x=time,y=diff),alpha=0.5) +
 		geom_smooth(aes(x=time,y=diff)) +
 		theme_few(base_size=20)
-		ggsave(filename=paste0("wind_rf_time_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_time_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -372,7 +372,7 @@
 		geom_boxplot(aes(x=island,y=diff,fill=island)) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Island group",begin = 0.1,end = 0.8,discrete=TRUE,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_island_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_island_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -389,7 +389,7 @@
 		geom_boxplot(aes(x=direction_d,y=diff,fill=direction_d)) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Wind direction",begin = 0.1,end = 0.8,discrete=TRUE,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_direction_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_direction_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -406,7 +406,7 @@
 		geom_boxplot(aes(x=month,y=diff,fill=month)) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Month",begin = 0.1,end = 0.8,discrete=TRUE,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_month_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_month_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -423,7 +423,7 @@
 		geom_boxplot(aes(x=year,y=diff,fill=year)) +
 		theme_few(base_size=20) +
  		viridis::scale_fill_viridis("Year",begin = 0.1,end = 0.8,discrete=TRUE,direction = 1,option = "H")
-		ggsave(filename=paste0("wind_rf_year_residual.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"wind_rf_year_residual.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 

@@ -25,7 +25,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2022_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2022
 #_____________________________________________________________________________________________________________________________
 # define helper function for converting DROP_TIME in 0-24 hours
 	convert_date_time = function(input_date,input_time,tz_input="UTC",tz_output="HST")

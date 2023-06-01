@@ -1,7 +1,7 @@
 
 
 # Nicholas Ducharme-Barth
-# 04/14/2022
+# 2023/06/01
 # Combine research_fishing_dt and camera_dt data sets into a combined analysis ready data set
 # define common columns
 # id: model_sampling_unit, design_sampling_unit
@@ -11,7 +11,7 @@
 # covar: depth, time, lunar_phase
 # q_covar: gear_type, platform, obs_wind, obs_wave, obs_current
 # catch: etco, etca, prsi, prfi, przo, hyqu, apru
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #_____________________________________________________________________________________________________________________________
@@ -25,7 +25,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2022
 #_____________________________________________________________________________________________________________________________
 # bring research fishing data
 	load(file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.RData"))
@@ -131,7 +131,7 @@
 	# [1] 1
 	 
 	# sapply(combined_dt.list,nrow)
-	# [1] 3887 3268 3171 3089 3086
+	# [1] 4686 3872 3770 3680 3677
 
 
 
