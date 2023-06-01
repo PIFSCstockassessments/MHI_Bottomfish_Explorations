@@ -1,9 +1,9 @@
 
 
 # Nicholas Ducharme-Barth
-# 03/09/2022
+# 2023/05/31
 # Format BFISH research fishing data
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #_____________________________________________________________________________________________________________________________
@@ -20,7 +20,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2021
 
 #_____________________________________________________________________________________________________________________________
 # define helper function for converting DRIFT_START_TIME & DRIFT_END_TIME to 0-24 decimal
