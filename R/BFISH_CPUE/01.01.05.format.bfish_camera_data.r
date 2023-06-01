@@ -1,13 +1,13 @@
 
 
 # Nicholas Ducharme-Barth
-# 12/20/2022
+# 2023/05/31
 # Format BFISH camera data: Option 5
 # The sampling_unit is defined as two camera drops within a PSU during the same sampling season
 # Sampling units are excluded if they contain drops that are "dark" or if they have missing length measurements
 # Values are averaged within sampling unit (PSU). 
 # Only sampling units with two camera drops in them are retained
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #_____________________________________________________________________________________________________________________________
@@ -22,7 +22,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2021
 
 #_____________________________________________________________________________________________________________________________
 # bring in camera data

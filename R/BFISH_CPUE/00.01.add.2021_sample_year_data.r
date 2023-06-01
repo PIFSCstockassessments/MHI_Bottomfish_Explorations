@@ -1,7 +1,7 @@
 
 
 # Nicholas Ducharme-Barth
-# 22/05/2023
+# 2023/05/22
 # Combine 2016-2021 BFISH data
 # also reformat DROP_DATE and DROP_TIME to be based on the DROP_CD column
 # now both DROP_DATE and DROP_TIME are in UTC

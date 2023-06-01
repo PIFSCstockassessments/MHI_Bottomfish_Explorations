@@ -1,7 +1,7 @@
 
 
 # Nicholas Ducharme-Barth
-# 22/05/2023
+# 2023/05/22
 # Format BFISH camera data: Option 1
 # The sampling_unit is defined as each individual drop
 # Drops are excluded if they are "dark" or if they have missing length measurements

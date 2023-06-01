@@ -1,9 +1,9 @@
 
 
 # Nicholas Ducharme-Barth
-# 12/19/2022
+# 2023/05/31
 # Format BFISH camera data
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # This is a sensitivity analysis to see how much of a difference it makes to PSU level biomass if: 
@@ -25,68 +25,43 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2021
 #_____________________________________________________________________________________________________________________________
 # define helper function for converting DROP_TIME in 0-24 hours
-	convert_drop_time = function(x)
-	{	
-		if(class(x)!="integer")
+	convert_date_time = function(input_date,input_time,tz_input="UTC",tz_output="HST")
+	{
+		hours = trunc(input_time)
+		minutes_raw = (input_time-hours)*60
+		minutes = trunc(minutes_raw)
+		seconds = trunc((minutes_raw-minutes)*60)
+		if(nchar(hours)<2)
 		{
-			stop("Bad data type. Must be integer.")
-		}
-		
-		# convert to 0-24 UTC
-		if(!is.na(x))
-		{
-			if(nchar(x)==3)
-			{
-				hour = 0
-				min = as.numeric(substr(x,1,1))/60
-				sec = as.numeric(substr(x,2,3))/(60^2)
-				time = hour + min + sec
-			} else if(nchar(x)==4){
-				hour = 0
-				min = as.numeric(substr(x,1,2))/60
-				sec = as.numeric(substr(x,3,4))/(60^2)
-				time = hour + min + sec
-			} else if(nchar(x)==5){
-				hour = as.numeric(substr(x,1,1))
-				min = as.numeric(substr(x,2,3))/60
-				sec = as.numeric(substr(x,4,5))/(60^2)
-				time = hour + min + sec
-			} else if(nchar(x)==6){
-				hour = as.numeric(substr(x,1,2))
-				min = as.numeric(substr(x,3,4))/60
-				sec = as.numeric(substr(x,5,6))/(60^2)
-				time = hour + min + sec
-			} else {
-				time = NA
-			}
-
-			# convert to HST (subtract 10 hours)
-				time = time - 10
-				if(!is.na(time))
-				{
-					if(time<0)
-					{
-						time = time + 24
-					}
-
-					# assume data-entry error if HST earlier than 6am or later than 6pm
-					# label UTC time as HST time in these cases
-					if(time<6|time>18)
-					{
-						time = time + 10
-						if(time>24)
-						{
-							time = time - 24
-						}
-					}
-				}
+			hours = paste0("0",hours)
 		} else {
-			time = NA
-		} 
-		return(time)
+			hours = as.character(hours)
+		}
+		if(nchar(minutes)<2)
+		{
+			minutes = paste0("0",minutes)
+		} else {
+			minutes = as.character(minutes)
+		}
+		if(nchar(seconds)<2)
+		{
+			seconds = paste0("0",seconds)
+		} else {
+			seconds = as.character(seconds)
+		}
+		time_chr = paste0(hours,":",minutes,":",seconds)
+		utc_date_time = strptime(paste0(input_date," ",time_chr),format="%Y%m%d %H:%M:%S",tz=tz_input)
+		new_time = utc_date_time = as.POSIXct(utc_date_time, tz=tz_input)
+		attr(new_time,"tzone")=tz_output
+		output_date = as.POSIXct(strptime(gsub("-","",strsplit(as.character(new_time)," ")[[1]][1]),format="%Y%m%d",tz=tz_output), tz=tz_output)
+		output_time_raw = as.numeric(strsplit(strsplit(as.character(new_time)," ")[[1]][2],":")[[1]])
+		output_time_raw[2] = output_time_raw[2]/60
+		output_time_raw[3] = output_time_raw[3]/60^2
+		output_time = sum(output_time_raw)
+		return(list(date=output_date,time=output_time))
 	}
 #_____________________________________________________________________________________________________________________________
 # determine which camera drops were unable to record lengths for some species
@@ -131,10 +106,10 @@
 		dark_drops = fread(paste0(proj.dir,"Data/",data_flag,"CAM_MAXN.csv"))[SPECIES_CD == "DARK"]$DROP_CD
 
 	# drop-specific information
-		BFISH_CAM_S = fread(paste0(proj.dir,"Data/",data_flag,"CAM_SAMPLE_TIME.csv")) %>%
+		BFISH_CAM_S = fread(paste0(proj.dir,"Data/",data_flag,"CAM_SAMPLE_TIME.csv"))
+		BFISH_CAM_S = BFISH_CAM_S %>%
 			  .[,.(DROP_CD,DROP_DATE,DROP_TIME,VESSEL,GEAR_ID,PSU,OBS_LON,OBS_LAT,OFFICIAL_DEPTH_M,OFFICIAL_TEMP_C)] %>%
-			  .[,DROP_TIME_HST:=sapply(DROP_TIME,convert_drop_time)] %>%
-			  .[,SAMPLE_DATE:=as.POSIXct(as.character(DROP_DATE),format=c("%Y%m%d"))] %>%
+			  .[,c("SAMPLE_DATE","DROP_TIME_HST"):= convert_date_time(DROP_DATE,DROP_TIME),by=seq_len(nrow(BFISH_CAM_S))] %>%
 			  .[,YEAR:=format(SAMPLE_DATE,format="%Y")] %>%
 			  .[,MONTH:=format(SAMPLE_DATE,format="%m")] %>%
 			  .[,DAY:=format(SAMPLE_DATE,format="%d")] %>%

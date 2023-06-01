@@ -1,7 +1,7 @@
 
 
 # Nicholas Ducharme-Barth
-# 22/05/2023
+# 2023/05/22
 # Combine 2016-2022 BFISH data
 # also reformat DROP_DATE and DROP_TIME to be based on the DROP_CD column
 # now both DROP_DATE and DROP_TIME are in UTC
@@ -63,7 +63,7 @@
 	
 	reformat_drift_date = function(x)
 	{
-		return(as.character(as.POSIXct(x,format="%m/%e/%Y")))
+		return(as.character(as.POSIXct(x,format="%Y-%m-%d")))
 	}
 
 #_____________________________________________________________________________________________________________________________
@@ -126,7 +126,19 @@
 		updated = rbind(old,new_pad[,select_cols])
 		colnames(updated) = original_old_cols
 
+		# report NAs
+		na_matrix = matrix(0,nrow=3,ncol=length(select_cols))
+		colnames(na_matrix) = original_old_cols
+		rownames(na_matrix) = c("old","new","updated")
+		for(i in 1:ncol(na_matrix))
+		{
+			na_matrix[1,i] = sum(ifelse(is.na(old[,i])|old[,i]=="NA",1,0))
+			na_matrix[2,i] = sum(ifelse(is.na(new_pad[,select_cols][,i])|new_pad[,select_cols][,i]=="NA",1,0))
+			na_matrix[3,i] = sum(ifelse(is.na(updated[,i])|updated[,i]=="NA",1,0))
+		}
+
 		print(missing_cols)
+		print(na_matrix)
 		return(updated)
 	}
 

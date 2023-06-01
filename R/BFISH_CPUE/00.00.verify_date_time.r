@@ -1,7 +1,7 @@
 
 
 # Nicholas Ducharme-Barth
-# 22/05/2023
+# 2023/05/22
 # confirm that we can just use the date/time from DROP_CD
 # DROP_CD records the date/time in UTC
 # Copyright (c) 2023 Nicholas Ducharme-Barth
