@@ -1,9 +1,9 @@
 
 
 # Nicholas Ducharme-Barth
-# 12/21/2022
+# 2023/06/01
 # Data exploration of effect of observed wind, wave (e.g., sea state) on research fishing catches
-# Copyright (c) 2022 Nicholas Ducharme-Barth
+# Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
@@ -23,11 +23,11 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2021_" # includes data through 2021
+	data_flag = "2022_" # includes data through 2022
 
 #_____________________________________________________________________________________________________________________________
 # load wind data
-	load(file=paste0(proj.dir,"Data/sample_wind_dt.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"sample_wind_dt.RData"))
 
 #_____________________________________________________________________________________________________________________________
 # load 02 data
@@ -68,7 +68,7 @@
         geom_point(aes(x=obs_wave,y=bin_kg,size=N,fill=weight_kg),shape=21) +
         theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Positive catch",begin = 0.1,end = 0.8,direction = 1,option = "H")
-		ggsave(filename=paste0("obs_wave_encounter.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"obs_wave_encounter.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
     
@@ -85,7 +85,7 @@
         geom_point(aes(x=obs_wind,y=bin_kg,size=N,fill=weight_kg),shape=21) +
         theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Positive catch",begin = 0.1,end = 0.8,direction = 1,option = "H")
-		ggsave(filename=paste0("obs_wind_encounter.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"obs_wind_encounter.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -102,7 +102,7 @@
         geom_point(aes(x=obs_current,y=bin_kg,size=N,fill=weight_kg),shape=21) +
         theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Positive catch",begin = 0.1,end = 0.8,direction = 1,option = "H")
-		ggsave(filename=paste0("obs_current_encounter.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"obs_current_encounter.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -131,7 +131,7 @@
         geom_point(aes(x=lon,y=lat,size=N,fill=value),shape=21) +
         theme_few(base_size=20) +
    		scale_fill_gradient2("Relative value",low = "blue",mid = "white",high = "red")
-		ggsave(filename=paste0("rf_spatial_encounter_catch_wind_wave.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"rf_spatial_encounter_catch_wind_wave.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
@@ -147,7 +147,7 @@
         geom_point(aes(x=lon,y=lat,size=N,fill=obs_current),shape=21) +
         theme_few(base_size=20) +
      	viridis::scale_fill_viridis("Obs.\ncurrent",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-		ggsave(filename=paste0("rf_spatial_current.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"rf_spatial_current.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)		
 
@@ -184,6 +184,6 @@
         geom_point(aes(x=lon,y=lat,size=N,fill=value),shape=21) +
         theme_few(base_size=20) +
    		scale_fill_gradient2("Relative value",low = "blue",mid = "white",high = "red")
-		ggsave(filename=paste0("camera_spatial_encounter_catch.png"), plot = p, device = "png", path = plot_dir,
+		ggsave(filename=paste0(data_flag,"camera_spatial_encounter_catch.png"), plot = p, device = "png", path = plot_dir,
 	  			scale = 1, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
