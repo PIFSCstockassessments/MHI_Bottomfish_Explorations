@@ -360,7 +360,7 @@
 			# which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,NA,NA)
+			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
@@ -395,7 +395,7 @@
 			# which(abs(fit_setup$ParHat$L_eta2_z)<1e-3|abs(fit_setup$ParHat$L_eta2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,NA,NA)
+			omega1_map = c(1,2,3,4,5,NA,6)
 			epsilon1_map = c(1,2,NA,3,NA,4,5)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
