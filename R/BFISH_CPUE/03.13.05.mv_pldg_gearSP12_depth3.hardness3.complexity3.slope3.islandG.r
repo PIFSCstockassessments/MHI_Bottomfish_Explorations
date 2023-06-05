@@ -84,7 +84,7 @@
         colnames(q_data)[2] = "category"
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
-		q_data$gear_type = factor(q_data[,'platform'])
+		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
 
         q1_formula = ~ gear_type:category
@@ -360,10 +360,10 @@
 			# which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,NA,NA)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			epsilon2_map = c(1,2,NA,3,4,NA,NA)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -395,10 +395,10 @@
 			# which(abs(fit_setup$ParHat$L_eta2_z)<1e-3|abs(fit_setup$ParHat$L_eta2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
-			omega1_map = c(1,2,3,4,5,NA,NA)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			omega1_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			epsilon2_map = c(1,2,NA,3,4,NA,NA)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -446,7 +446,7 @@
     	  						spatial_list = spatial_list,
 								Map = modified_map,
     	  						Parameters = modified_parameters,
-    	  						test_fit=TRUE); gc()
+    	  						test_fit=FALSE); gc()
 		fit$parameter_estimates
 
 		# re-fit model using Map and Parameters from fit in order to get aggregate index
@@ -476,7 +476,8 @@
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
     	  						spatial_list = spatial_list,
 								Map = fit$tmb_list$Map,
-    	  						Parameters = fit$ParHat); gc()
+    	  						Parameters = fit$ParHat,
+                                test_fit=FALSE); gc()
 			fit_agg$parameter_estimates$time_for_run
 		
 		# bias correction

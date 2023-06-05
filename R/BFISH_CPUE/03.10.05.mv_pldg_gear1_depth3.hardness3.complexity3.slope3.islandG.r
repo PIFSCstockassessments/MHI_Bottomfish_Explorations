@@ -84,7 +84,7 @@
         colnames(q_data)[2] = "category"
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
-		q_data$gear_type = factor(q_data[,'platform'])
+		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
 
         q1_formula = ~ gear_type
