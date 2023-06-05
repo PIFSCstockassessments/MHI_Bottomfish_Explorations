@@ -28,6 +28,7 @@
 
 		summary_dt.list[[i]] = data.table(date=strsplit(ests_vec[i],"/")[[1]][1],
 										  name=strsplit(ests_vec[i],"/")[[1]][2]) %>%
+								.[,data_year:=strsplit(name,"_")[[1]][1]] %>%		  
 								.[,error_structure:=strsplit(name,"_")[[1]][2]] %>%
 								.[,species := strsplit(name,"_")[[1]][3]] %>%
 								.[,data_treatment := strsplit(name,"_")[[1]][4]] %>%
@@ -42,6 +43,7 @@
 								.[,n_fixed:=parameter_estimates$number_of_coefficients[2]] %>%
 								.[,n_random:=parameter_estimates$number_of_coefficients[3]] %>%
 								.[,aic:=parameter_estimates$AIC] %>%
+								.[,aic_all:=2*n_par+2*nll] %>%
 								.[,mgc:=parameter_estimates$max_gradient] %>%
 								.[,pdh:=parameter_estimates$SD$pdHess] %>%
 								cbind(.,t(t(table(parameter_estimates$diagnostics$Param)))) %>%
@@ -52,8 +54,8 @@
 	}
 
 	summary_dt = rbindlist(summary_dt.list) %>%
-				 dcast(.,date+name+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+date+runtime+nll+n_par+n_fixed+n_random+aic+mgc+pdh~parameter)
+				 dcast(.,date+name+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+pdh~parameter)
 
-	fwrite(summary_dt,file=paste0(proj.dir,"VAST/model_runs/comparison_plots/summary_dt.csv"))
+	fwrite(summary_dt,file=paste0(proj.dir,"VAST/model_runs/comparison_plots/summary_dt.",as.character(format(Sys.time(),format="%Y-%m-%d")),".csv"))
 
 	
