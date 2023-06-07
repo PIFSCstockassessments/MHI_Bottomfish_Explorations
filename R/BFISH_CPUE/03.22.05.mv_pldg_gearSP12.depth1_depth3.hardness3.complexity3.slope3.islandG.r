@@ -25,7 +25,7 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP12.pltSP1" # vanilla
+    catchability_covariates = "gearSP12.depth1" # vanilla
     abundance_covariates = "depth3.hardness3.complexity3.slope3.islandG" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -86,8 +86,9 @@
         q_data$gear_type = factor(q_data[,'gear_type'])
 		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
+        q_data$depth_sc = scale(q_data$depth)
 
-        q1_formula = ~ gear_type:category + gear_type:platform
+        q1_formula = ~ gear_type:category + gear_type:depth_sc
         q2_formula = ~ gear_type:category
 
         continuous_q_variables = c("depth")
@@ -361,7 +362,7 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			epsilon1_map = c(1,2,NA,3,4,5,6)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
 			# eta1_map = c(1,2,3,4,5,6,7)
@@ -396,7 +397,7 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			epsilon1_map = c(1,2,NA,3,4,5,6)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
 			# eta1_map = c(1,2,3,4,5,6,7)

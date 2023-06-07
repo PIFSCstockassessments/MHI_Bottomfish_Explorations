@@ -25,7 +25,7 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP12.pltSP1" # vanilla
+    catchability_covariates = "gearSP12.REpltSP1" # vanilla
     abundance_covariates = "depth3.hardness3.complexity3.slope3.islandG" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -87,7 +87,7 @@
 		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
 
-        q1_formula = ~ gear_type:category + gear_type:platform
+        q1_formula = ~ gear_type:category
         q2_formula = ~ gear_type:category
 
         continuous_q_variables = c("depth")
@@ -316,7 +316,7 @@
 								 max_cells=Inf,
 								 ObsModel=obs_model)
 		settings$grid_size_km = 0.5
-		settings$OverdispersionConfig = c("eta1"=0, "eta2"=0)
+		settings$OverdispersionConfig = c("eta1"=1, "eta2"=0)
 		settings$Options = c( settings$Options, "range_fraction"=0.01 )
 
 	# set-up model
@@ -356,21 +356,21 @@
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon1_z")])>1.5e1)
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_omega2_z")])>1.5e1)
 			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_epsilon2_z")])>1.5e1)
-			# which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])>1.5e1)
+			which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta1_z")])>1.5e1)
 			# which(abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])<1e-3|abs(fit_setup$parameter_estimates$opt$par[which(names(fit_setup$parameter_estimates$opt$par)=="L_eta2_z")])>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			epsilon1_map = c(NA,1,NA,NA,2,3,NA)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
-			# eta1_map = c(1,2,3,4,5,6,7)
+			eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
-			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
             # modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
 			# modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
 			# modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
@@ -380,7 +380,7 @@
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
-			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
 			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
 			# modified_parameters$lambda1_k[5:7] = 0
 			# modified_parameters$lambda2_k[5:7] = 0
@@ -391,21 +391,21 @@
 			which(abs(fit_setup$ParHat$L_epsilon1_z)<1e-3|abs(fit_setup$ParHat$L_epsilon1_z)>1.5e1)
 			which(abs(fit_setup$ParHat$L_omega2_z)<1e-3|abs(fit_setup$ParHat$L_omega2_z)>1.5e1)
 			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-3|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
-			# which(abs(fit_setup$ParHat$L_eta1_z)<1e-3|abs(fit_setup$ParHat$L_eta1_z)>1.5e1)
+			which(abs(fit_setup$ParHat$L_eta1_z)<1e-3|abs(fit_setup$ParHat$L_eta1_z)>1.5e1)
 			# which(abs(fit_setup$ParHat$L_eta2_z)<1e-3|abs(fit_setup$ParHat$L_eta2_z)>1.5e1)
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
+			epsilon1_map = c(NA,1,NA,NA,2,3,NA)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
 			epsilon2_map = c(1,2,3,4,5,NA,6)
-			# eta1_map = c(1,2,3,4,5,6,7)
+			eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
 			modified_map$L_epsilon1_z = factor(epsilon1_map,levels=1:max(epsilon1_map,na.rm=TRUE))
 			modified_map$L_omega2_z = factor(omega2_map,levels=1:max(omega2_map,na.rm=TRUE))
 			modified_map$L_epsilon2_z = factor(epsilon2_map,levels=1:max(epsilon2_map,na.rm=TRUE))
-			# modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
+			modified_map$L_eta1_z = factor(eta1_map,levels=1:max(eta1_map,na.rm=TRUE))
 			# modified_map$L_eta2_z = factor(eta2_map,levels=1:max(eta2_map,na.rm=TRUE))
 			# modified_map$lambda1_k = factor(c(1:4,5,5,5),levels=1:5)
 			# modified_map$lambda2_k = factor(c(1:4,5,5,5),levels=1:5)
@@ -415,7 +415,7 @@
 			modified_parameters$L_epsilon1_z[which(is.na(epsilon1_map))] = 1e-8
 			modified_parameters$L_omega2_z[which(is.na(omega2_map))] = 1e-8
 			modified_parameters$L_epsilon2_z[which(is.na(epsilon2_map))] = 1e-8
-			# modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
+			modified_parameters$L_eta1_z[which(is.na(eta1_map))] = 1e-8
 			# modified_parameters$L_eta2_z[which(is.na(eta2_map))] = 1e-8
 			# modified_parameters$lambda1_k[5:7] = 0
 			# modified_parameters$lambda2_k[5:7] = 0
