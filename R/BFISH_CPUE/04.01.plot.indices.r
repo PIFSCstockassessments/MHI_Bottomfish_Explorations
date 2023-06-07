@@ -609,4 +609,119 @@
 	  			scale = 1.25, width = 16, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)   
 
-    
+
+#_____________________________________________________________________________________________________________________________
+# plot 7) compare 2022 data models
+# data type: 05
+    dt_01 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-04/2022_pldg_mv_05_v_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="01 base"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    dt_02 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-04/2022_pldg_mv_05_gear1_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="02 gear1"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    dt_03 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-05/2022_pldg_mv_05_gearSP1.5_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="03 gearSP1.5"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+     dt_04 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-04/2022_pldg_mv_05_gearSP1_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="04 gearSP1"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    dt_05 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-04/2022_pldg_mv_05_gear12_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="05 gear12"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+    dt_06 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-05/2022_pldg_mv_05_gearSP12.5_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="06 gearSP12.5"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+     dt_07 = fread(paste0(proj.dir,"VAST/model_runs/2023-06-04/2022_pldg_mv_05_gearSP12_depth3.hardness3.complexity3.slope3.islandG_TRUE_7.5_TRUE_TRUE_pit_noxval/index_dt.csv")) %>%
+                     .[,Model:="07 gearSP12"] %>%
+                     .[,Category:=deep7_name_vec[match(Category,deep7_code_vec)]] %>%
+                     .[is.na(Category),Category:="Total"] %>%
+                     .[,Category:=factor(Category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+                                                                                                                                                                                           
+    p7 = rbind(design_dt,dt_01,dt_02,dt_03,dt_04,dt_05,dt_06,dt_07) %>%
+            .[Model=="design",Model:="00 design"] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Predicted biomass (millions lbs)") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Model),alpha=0.25) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p7_2022_index.png"), plot = p7, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)                        
+
+    p7 = rbind(design_dt,dt_01,dt_02,dt_03,dt_04,dt_05,dt_06,dt_07) %>%
+            .[Model=="design",Model:="00 design"] %>%
+			.[,Estimate:=Estimate/mean(Estimate),by=.(Model,Category)] %>%
+			.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
+			.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Relative biomass") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_hline(yintercept=1,linetype="dashed") +
+			geom_ribbon(aes(x=Time,ymin=l95,ymax=u95,group=Model,fill=Model),alpha=0.25) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p7_2022_index_relative.png"), plot = p7, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)   
+   
+   
+    p7 = rbind(design_dt,dt_01,dt_02,dt_03,dt_04,dt_05,dt_06,dt_07) %>%
+            .[Model=="design",Model:="00 design"] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Predicted biomass (millions lbs)") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p7_2022_index_noRibbon.png"), plot = p7, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)                        
+
+    p7 = rbind(design_dt,dt_01,dt_02,dt_03,dt_04,dt_05,dt_06,dt_07) %>%
+            .[Model=="design",Model:="00 design"] %>%
+			.[,Estimate:=Estimate/mean(Estimate),by=.(Model,Category)] %>%
+			.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
+			.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))] %>%
+            ggplot() +
+			ylim(0,NA) +
+			ylab("Relative biomass") +
+			xlab("Year") +
+			facet_wrap(~Category,scales="free") +
+			geom_hline(yintercept=0) +
+			geom_hline(yintercept=1,linetype="dashed") +
+			geom_path(aes(x=Time,y=Estimate,group=Model,color=Model),linewidth=1.5) +
+			viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			theme_few(base_size=20)
+        ggsave(filename=paste0("p7_2022_index_relative_noRibbon.png"), plot = p7, device = "png", path = dir_plot,
+	  			scale = 1.25, width = 16, height = 9, units = c("in"),
+	  			dpi = 300, limitsize = TRUE)   
+
+        
