@@ -87,7 +87,7 @@
 		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
 
-        q1_formula = ~ gear_type:category + gear_type:platform
+        q1_formula = ~ gear_type:category + platform:category
         q2_formula = ~ gear_type:category
 
         continuous_q_variables = c("depth")
@@ -361,9 +361,9 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
+			omega2_map = c(1,2,3,4,5,NA,NA)
+			epsilon2_map = c(1,2,NA,3,4,NA,NA)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -396,9 +396,9 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,3,NA,4,5)
-			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,3,4,5,NA,6)
+			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
+			omega2_map = c(1,2,3,4,5,NA,NA)
+			epsilon2_map = c(1,2,NA,3,4,NA,NA)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -447,7 +447,7 @@
 								Map = modified_map,
     	  						Parameters = modified_parameters,
     	  						test_fit=FALSE); gc()
-		fit$parameter_estimates
+		# fit$parameter_estimates
 
 		# re-fit model using Map and Parameters from fit in order to get aggregate index
 		dir.create(paste0(working_dir,"agg/"),recursive=TRUE)

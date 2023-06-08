@@ -25,7 +25,7 @@
     link_function = "pldg" # poisson-link delta-gamma
     species = "mv"
     data_treatment = "05"
-    catchability_covariates = "gearSP12.pltSP12" # vanilla
+    catchability_covariates = "gearSP12.monthSP3" # vanilla
     abundance_covariates = "depth3.hardness3.complexity3.slope3.islandG" # vanilla
     lehi_filter = TRUE
     km_cutoff = 7.5 # make this smaller to increase the spatial resolution of the model
@@ -80,17 +80,22 @@
     }
 	
     # define catchability section
-        q_data = bfish_df[,c("year","species_cd","gear_type","platform","depth")]
+        q_data = bfish_df[,c("year","species_cd","gear_type","platform","depth","time","month","lunar_phase")]
         colnames(q_data)[2] = "category"
+		colnames(q_data)[8] = "lunarphase"
+		q_data$month = as.numeric(as.character(q_data$month))
         q_data$category = factor(q_data[,'category'],levels=c(target_species))
         q_data$gear_type = factor(q_data[,'gear_type'])
 		q_data$platform = factor(q_data[,'platform'])
 		q_data$depth[which(q_data$gear_type=="research_fishing")] = 0
+		q_data$time_sc = scale(q_data$time)
+		q_data$lunarphase_sc = scale(q_data$lunarphase)
+		q_data$month_sc = scale(q_data$month)
 
-        q1_formula = ~ gear_type:category + platform:category
-        q2_formula = ~ gear_type:category + platform:category
+        q1_formula = ~ gear_type:category + category:bs(month_sc,df=3)
+        q2_formula = ~ gear_type:category
 
-        continuous_q_variables = c("depth")
+        continuous_q_variables = c("depth","time_sc","lunarphase_sc","month_sc")
 
 	# needed to define spatial domain and for predicting on to create index
 	psu_table = fread(paste0(proj.dir,"Data/BFISH PSU lookup table.csv")) %>%
@@ -361,9 +366,9 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
+			epsilon1_map = c(1,2,NA,3,4,5,6)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,NA,3,4,NA,NA)
+			epsilon2_map = c(1,2,3,4,5,NA,6)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -396,9 +401,9 @@
 
 			modified_map = fit_setup$tmb_list$Map
 			omega1_map = c(1,2,3,4,5,NA,6)
-			epsilon1_map = c(1,2,NA,NA,NA,3,NA)
+			epsilon1_map = c(1,2,NA,3,4,5,6)
 			omega2_map = c(1,2,3,4,NA,NA,NA)
-			epsilon2_map = c(1,2,NA,3,4,NA,NA)
+			epsilon2_map = c(1,2,3,4,5,NA,6)
 			# eta1_map = c(1,2,3,4,5,6,7)
 			# eta2_map = c(1,2,3,4,5,6,7)
 			modified_map$L_omega1_z = factor(omega1_map,levels=1:max(omega1_map,na.rm=TRUE))
@@ -447,7 +452,7 @@
 								Map = modified_map,
     	  						Parameters = modified_parameters,
     	  						test_fit=FALSE); gc()
-		# fit$parameter_estimates
+		fit$parameter_estimates
 
 		# re-fit model using Map and Parameters from fit in order to get aggregate index
 		dir.create(paste0(working_dir,"agg/"),recursive=TRUE)
