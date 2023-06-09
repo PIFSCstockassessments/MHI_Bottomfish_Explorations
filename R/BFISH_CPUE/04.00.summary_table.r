@@ -66,6 +66,15 @@
 		parameter_estimates = read_vast_parameter_estimates(readLines(paste0(proj.dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/setup/parameter_estimates.txt")))
 
 		tmp_complete = grep(paste0(tmp_date,"/",tmp_name),complete_vec,fixed=TRUE)
+		if(sum(tmp_complete)>0)
+		{
+			parameter_estimates_final = read_vast_parameter_estimates(readLines(paste0(proj.dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/parameter_estimates.txt")))
+			var_par = grep("\\bL_",parameter_estimates_final$diagnostics$Param)
+			problem_par = sum(which(abs(parameter_estimates_final$diagnostics[var_par,"MLE"])<1e-3|abs(parameter_estimates_final$diagnostics[var_par,"MLE"])>1.5e1))
+			rm(list=c("parameter_estimates_final","var_par"))
+		} else {
+			problem_par = NA
+		}
 		summary_dt.list[[i]] = data.table(date=tmp_date,
 										  name=tmp_name) %>%
 								.[,data_year:=strsplit(name,"_")[[1]][1]] %>%		  
@@ -87,15 +96,16 @@
 								.[,mgc:=parameter_estimates$max_gradient] %>%
 								# .[,pdh:=parameter_estimates$SD$pdHess] %>%
 								.[,complete:=ifelse(sum(tmp_complete)>0,TRUE,FALSE)] %>%
+								.[,bad_param:=problem_par] %>%
 								cbind(.,t(t(table(parameter_estimates$diagnostics$Param)))) %>%
 								.[,V2:=NULL] %>%
 								setnames(.,"V1","parameter") 
 		
-		rm(list=c("parameter_estimates","tmp_date","tmp_name","tmp_complete"))
+		rm(list=c("parameter_estimates","tmp_date","tmp_name","tmp_complete","problem_par"))
 	}
 
 	summary_dt = rbindlist(summary_dt.list) %>%
-				 dcast(.,date+name+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+complete~parameter)
+				 dcast(.,date+name+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+complete+bad_param~parameter)
 
 	fwrite(summary_dt,file=paste0(proj.dir,"VAST/model_runs/comparison_plots/summary_dt.",as.character(format(Sys.time(),format="%Y-%m-%d")),".csv"))
 
