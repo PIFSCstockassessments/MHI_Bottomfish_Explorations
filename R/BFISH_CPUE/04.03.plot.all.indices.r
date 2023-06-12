@@ -120,7 +120,7 @@
 	  			dpi = 300, limitsize = TRUE)                        
 
     	p = copy(index_dt) %>%
-			# .[model_number %in% c(0,11,15,16)] %>%	
+			# .[model_number %in% c(0,11,17:19)] %>%	
 			.[,Estimate:=Estimate/mean(Estimate),by=.(Model,Category)] %>%
 			.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
 			.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))] %>%
