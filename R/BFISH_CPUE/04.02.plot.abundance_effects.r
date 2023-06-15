@@ -36,7 +36,7 @@
         .[STRATA=="SB_H_S",STRATA:="SB_A_S"] %>%
 				.[,.(PSU,STRATA,Island,Depth_MEDIAN_m,med_acr,BS_pct_over_136j,pctHS)] %>%
 				setnames(.,c("PSU","STRATA","Island","Depth_MEDIAN_m","med_acr","BS_pct_over_136j","pctHS"),c("psu","strata","island","depth","complexity","hardness","slope")) %>%
-				.[complexity>300,complexity:=300] %>%
+				.[complexity>750,complexity:=750] %>%
         .[is.na(complexity),complexity:=12.20] %>%
         .[is.na(hardness),hardness:=0.094888] %>%
 				.[,islandG:=ifelse(island=="Niihau","Kauai",island)] %>%
@@ -88,6 +88,27 @@
 
 #_____________________________________________________________________________________________________________________________
 # define helper functions
+  # load(paste0(proj_dir,"VAST/model_runs/",continuous_abundance_models[10]))
+  # fit_internal = fit
+  # model_name = "test"
+  # continuous_ab_variables = c("depth_sc","complexity_sc","hardness_sc","slope_sc")
+  # target_species = c("prfi","etca","etco","prsi","przo","hyqu","apru")
+
+  # dt_list = as.list(rep(NA,49))
+  # iter=1
+  # for(y in 1:length(dimnames(fit_internal$Report$R1_gct)[[3]]))
+  # {
+  #   for(s in 1:length(dimnames(fit_internal$Report$R1_gct)[[2]]))
+  #   {
+  #     dt_list[[iter]] = copy(psu_table) %>%
+  #                      .[,R1:=fit_internal$Report$R1_gct[,s,y]] %>%
+  #                      .[,species_cd:=dimnames(fit_internal$Report$R1_gct)[[2]][s]] %>%
+  #                      .[,year:=as.numeric(dimnames(fit_internal$Report$R1_gct)[[3]][s])]
+  #     iter=iter+1    
+  #   }
+  # }
+  # dt = rbindlist(dt_list)
+
 
   extract_continuous_abundance_effect = function(fit_internal,
                                                 model_name,
