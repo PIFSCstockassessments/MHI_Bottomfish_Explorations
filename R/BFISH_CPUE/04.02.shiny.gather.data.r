@@ -136,6 +136,126 @@
                     
   }
 
+  
+  extract_catchability_effect = function(fit_internal,
+                                                model_name,
+                                                discrete_variables = c("gear_type","platform"),
+												continuous_variables =c("time","month","lunarphase"))
+  {
+    # checks
+      variables = intersect(c(discrete_variables,continuous_variables),colnames(fit_internal$catchability_data))
+      keep_vec_1 = rep(NA,length(variables))
+	  keep_vec_2 = rep(NA,length(variables))
+      for(i in 1:length(variables))
+      {
+        keep_vec_1[i] =ifelse(sum(grep(variables[i],fit_internal$Q1_formula))>0,TRUE,FALSE)
+        keep_vec_2[i] =ifelse(sum(grep(variables[i],fit_internal$Q2_formula))>0,TRUE,FALSE)
+      }
+
+      variables_1 = variables[keep_vec_1]
+	  variables_2 = variables[keep_vec_2]
+
+    if(fit_internal$ParHat[1] == "Model is not converged")
+    {
+      q_effect_dt = data.table(model_name=model_name,
+                                       component=NA,
+                                       species_cd=NA,
+                                       category=NA,
+                                       variable_c=NA,
+									   variable_d=NA,
+                                       value=NA,
+                                       value_link=NA,
+                                       value_link_rescale=NA,
+                                       value_rescale=NA)
+    } else {
+	  # fit_internal$catchability_data$a_i = fit_internal$data_list$a_i
+      q_df_1 = fit_internal$catchability_data[,c("year","category",variables_1)]
+      q_df_2 = fit_internal$catchability_data[,c("year","category",variables_2)]
+
+      q_effect_dt_1.list = as.list(rep(NA,length(variables_1)))
+      for(i in 1:length(variables_1))
+      {
+		  tmp_cols = c("year","category",variables_1[i])
+          q_effect_dt_1.list[[i]] = as.data.table(q_df_1) %>%
+            .[,..tmp_cols] %>%
+            .[,value:=fit_internal$data_list$Q1_ik[,grep(variables_1[i],dimnames(fit_internal$data_list$Q1_ik)[[2]])] %*% t(t(fit_internal$ParHat$lambda1_k[grep(variables_1[i],dimnames(fit_internal$data_list$Q1_ik)[[2]])]))] %>%
+            setnames(.,c("category",variables_1[i]),c("species_cd","variable"))
+		  if(variables_1[i]%in%continuous_variables)
+		  {
+			q_effect_dt_1.list[[i]] = q_effect_dt_1.list[[i]] %>%
+				setnames(.,"variable","variable_c") %>%
+				.[,variable_d:=NA]
+		  } else {
+			q_effect_dt_1.list[[i]] = q_effect_dt_1.list[[i]] %>%
+				setnames(.,"variable","variable_d") %>%
+				.[,variable_c:=NA]
+		  }
+		  q_effect_dt_1.list[[i]] = q_effect_dt_1.list[[i]] %>%
+            .[,value_link:=exp(value)] %>%
+            .[,category:=variables_1[i]] %>%
+            .[,component:="1st"] %>%
+			.[,.(model_name,component,species_cd,category,variable_c,variable_d,value,value_link)]
+        
+        rm(list="tmp_cols")
+      }
+      q_effect_dt_1 = rbindlist(q_effect_dt_1.list) %>%
+                            .[,model_name:=model_name] %>%
+                            .[,value_link_rescale:=value_link/max(value_link),by=.(species_cd,category)] %>%
+                            .[,value_rescale:=scales::rescale(value),by=.(species_cd,category)] %>%
+                            .[,.(model_name,component,species_cd,category,variable_c,variable_d,value,value_link,value_link_rescale,value_rescale)]     
+	  if(length(variables_2)>0)
+	  {
+		q_effect_dt_2.list = as.list(rep(NA,length(variables_2)))
+		for(i in 1:length(variables_2))
+		{
+			tmp_cols = c("year","category",variables_2[i])
+			q_effect_dt_2.list[[i]] = as.data.table(q_df_2) %>%
+				.[,..tmp_cols] %>%
+				.[,value:=fit_internal$data_list$Q2_ik[,grep(variables_2[i],dimnames(fit_internal$data_list$Q2_ik)[[2]])] %*% t(t(fit_internal$ParHat$lambda2_k[grep(variables_2[i],dimnames(fit_internal$data_list$Q2_ik)[[2]])]))] %>%
+				setnames(.,c("category",variables_2[i]),c("species_cd","variable"))
+		  if(variables_2[i]%in%continuous_variables)
+		  {
+			q_effect_dt_2.list[[i]] = q_effect_dt_2.list[[i]] %>%
+				setnames(.,"variable","variable_c") %>%
+				.[,variable_d:=NA]
+		  } else {
+			q_effect_dt_2.list[[i]] = q_effect_dt_2.list[[i]] %>%
+				setnames(.,"variable","variable_d") %>%
+				.[,variable_c:=NA]
+		  }
+		  q_effect_dt_2.list[[i]] = q_effect_dt_2.list[[i]] %>%
+				.[,value_link:=exp(value)] %>%
+				.[,category:=variables_2[i]] %>%
+				.[,component:="2nd"] %>%
+				.[,.(model_name,component,species_cd,category,variable_c,variable_d,value,value_link)]
+			
+			rm(list="tmp_cols")
+		}
+		q_effect_dt_2 = rbindlist(q_effect_dt_2.list) %>%
+								.[,model_name:=model_name] %>%
+								.[,value_link_rescale:=value_link/max(value_link),by=.(species_cd,category)] %>%
+								.[,value_rescale:=scales::rescale(value),by=.(species_cd,category)] %>%
+								.[,.(model_name,component,species_cd,category,variable_c,variable_d,value,value_link,value_link_rescale,value_rescale)]     
+		
+	  } else {
+		      q_effect_dt_2 = data.table(model_name=model_name,
+                                       component="2nd",
+                                       species_cd=NA,
+                                       category=NA,
+                                       variable_c=NA,
+									   variable_d=NA,
+                                       value=NA,
+                                       value_link=NA,
+                                       value_link_rescale=NA,
+                                       value_rescale=NA)
+	  }
+
+	  q_effect_dt = rbind(q_effect_dt_1,q_effect_dt_2) %>% unique(.)
+    }
+    return(unique(q_effect_dt))               
+  }
+
+
 #_____________________________________________________________________________________________________________________________
 # set working directory
 	proj_dir = "D:/HOME/SAP/2024_Deep7/"
@@ -256,7 +376,7 @@
   # order by last modified
   ests_vec = ests_vec[order(sapply(paste0(proj_dir,"VAST/model_runs/",ests_vec),file.mtime))]
 
-  abundance_effect_dt.list = index_summary_dt.list = index_dt.list = as.list(rep(NA,length(ests_vec)))
+  q_effect_dt.list = abundance_effect_dt.list = index_summary_dt.list = index_dt.list = as.list(rep(NA,length(ests_vec)))
   
   for(i in seq_along(index_dt.list))
   {
@@ -294,6 +414,7 @@
 		var_par = grep("\\bL_",parameter_estimates_final$diagnostics$Param)
 		problem_par = sum(which(abs(parameter_estimates_final$diagnostics[var_par,"MLE"])<1e-3|abs(parameter_estimates_final$diagnostics[var_par,"MLE"])>1.5e1))
 
+		# Add check to see if residuals are calculated, then make a summary data.table
 				index_summary_dt.list[[i]] = data.table(date=tmp_date,
 										  name=tmp_name) %>%
   		                        .[,model_name_short:=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name)] %>%
@@ -320,11 +441,14 @@
 								cbind(.,t(t(table(parameter_estimates$diagnostics$Param)))) %>%
 								.[,V2:=NULL] %>%
 								setnames(.,"V1","parameter")
-		if(tmp_model[6]!="v")
+		if(tmp_model[6]!="v"|tmp_model[5]!="v")
 		{
 			load(paste0(proj_dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/fit.RData"))
+		}						
+		if(tmp_model[6]!="v")
+		{
 			abundance_effect_dt.list[[i]] = extract_abundance_effects(fit_internal=fit,model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name))
-			rm(list=c("fit"))
+			
 		} else {
 			abundance_effect_dt.list[[i]] = data.table(model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name),
                                        component=NA,
@@ -337,8 +461,23 @@
                                        value_link_rescale=NA,
                                        value_rescale=NA)
 		}
+		if(tmp_model[5]!="v")
+		{
+			q_effect_dt.list[[i]] = extract_catchability_effect(fit_internal=fit,model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name))
+		} else {
+			q_effect_dt.list[[i]] = data.table(model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name),
+                                       component=NA,
+                                       species_cd=NA,
+                                       category=NA,
+                                       variable_c=NA,
+									   variable_d=NA,
+                                       value=NA,
+                                       value_link=NA,
+                                       value_link_rescale=NA,
+                                       value_rescale=NA)
+		}
 
-    rm(list=c("tmp_model","tmp_model_name","tmp_name","tmp_date","parameter_estimates_final","var_par","problem_par","parameter_estimates"))
+    rm(list=c("fit","tmp_model","tmp_model_name","tmp_name","tmp_date","parameter_estimates_final","var_par","problem_par","parameter_estimates"))
   }
 
   index_dt = rbind(design_dt,rbindlist(index_dt.list)) %>%
@@ -361,12 +500,22 @@
 					.[,species_cd:=deep7_name_vec[match(species_cd,deep7_code_vec)]] %>%
                     .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 
+  q_effect_dt = rbindlist(q_effect_dt.list) %>%
+					setnames(.,"model_name","model_name_short") %>%
+					merge(.,data.table(model_name_short="00 design"),by=c("model_name_short"),all=TRUE) %>%
+  					.[,model_number:=as.numeric(sapply(model_name_short,function(x)strsplit(x,"\\s+")[[1]][1]))] %>%
+					.[order(model_number)] %>%
+					.[,.(model_number,model_name_short,component,species_cd,category,variable_c,variable_d,value,value_link,value_link_rescale,value_rescale)] %>%
+					.[,species_cd:=deep7_name_vec[match(species_cd,deep7_code_vec)]] %>%
+                    .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+
 
 #_____________________________________________________________________________________________________________________________
 # save
 	fwrite(index_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/index_dt.csv"))
 	fwrite(index_summary_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/index_summary_dt.csv"))
 	fwrite(abundance_effect_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/abundance_effect_dt.csv"))
+	fwrite(q_effect_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/q_effect_dt.csv"))
 
 	fwrite(plot_empirical_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_ab_dt.csv"))
 	fwrite(plot_empirical_discrete_dt,file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_discrete_ab_dt.csv"))
