@@ -3,6 +3,12 @@
 # Nicholas Ducharme-Barth
 # 2023/06/04
 # plot indices shiny app
+# 1) index
+# 2) effects (abundance & catchability)
+# 3) influ
+# 4) rmse
+# 5) spatial predictions
+# 6) residuals
 
 # Copyright (c) 2023 Nicholas Ducharme-Barth
 # You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
@@ -109,7 +115,15 @@ ui = dashboardPage(
       onLabel = "TRUE",
       offLabel = "FALSE",
       onStatus = "success", 
-      offStatus = "danger")
+      offStatus = "danger"),
+      # design gray scale
+      sliderTextInput(
+      inputId = "index_grayscale",
+      label = "Choose\ndesign-based index\ngray-scale:", 
+        choices = seq(from=0,to=100,by=10),
+        selected = c(30),
+        force_edges = TRUE,
+      grid = TRUE)
     ),
     conditionalPanel(condition="input.sidebarmenu == 'effect_plots'",
       # species
@@ -175,9 +189,14 @@ ui = dashboardPage(
       # **** Effect plots ****
       tabItem(tabName="effect_plots", h2("Effect plots"),
         fluidRow(
-          box(title="Estimated abundance effects", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
-            p("Continuous covariates."),
+          box(title="Estimated abundance effects: continuous covariates", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
+            p("Select at least one model with defined continuous abundance covariates."),
             plotOutput("ab_effect_plots_c", height="auto"))
+        ),
+        fluidRow(
+          box(title="Estimated abundance effects: discrete covariates", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
+            p("Select at least one model with defined discrete abundance covariates."),
+            plotOutput("ab_effect_plots_d", height="auto"))
         )
       ) # End of effect_plots tab
     ) # End of tabItems
@@ -238,7 +257,6 @@ server = function(input, output){
 
   # define plots
   output$index_plots = renderPlot({
-    # Which models and fisheries
     input_models = unique(filtered_table()$model_name_short)
     input_species = input$category
     if(length(input_models) < 1 | length(input_species) < 1){
@@ -280,9 +298,12 @@ server = function(input, output){
       }
 			p = p + geom_path(aes(x=time,y=estimate,group=model_name_short,color=model_name_short),linewidth=1.5)
     }
-			p = p + viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
-			viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+    	p = p + scale_colour_manual("Model",values=c(paste0("gray",input$index_grayscale),viridis::viridis_pal(alpha = 1, begin = 0.1, end = 0.8, direction = 1, option = "H")(uniqueN(plot_dt$model_name_short)-1))) +
+			scale_fill_manual("Model",values=c(paste0("gray",input$index_grayscale),viridis::viridis_pal(alpha = 1, begin = 0.1, end = 0.8, direction = 1, option = "H")(uniqueN(plot_dt$model_name_short)-1))) +
 			theme_few(base_size=20)
+			# p = p + viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			# viridis::scale_fill_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE) +
+			# theme_few(base_size=20)
     return(p)
   },
   height=function(){
@@ -294,8 +315,8 @@ server = function(input, output){
     }
     return(max(height_per_panel*1.5, (height_per_panel * ceiling(length(input$category) / n_col))))
   })
+  # continuous abundance effects
   output$ab_effect_plots_c = renderPlot({
-    # Which models and fisheries
     input_models = unique(filtered_table()$model_name_short)
     input_species = input$effect_species
     input_trans = input$effect_trans
@@ -366,6 +387,80 @@ server = function(input, output){
     scale_fill_manual("Gear type",values=c("gray60","gray80")) +
 	  viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
    
+    return(p)
+  },
+  height=function(){
+      n_col = length(input$effect_species)
+    return(max(height_per_panel*2.25, (height_per_panel * ceiling(length(input$effect_species) / n_col))))
+  })
+  # discrete abundance effects
+  output$ab_effect_plots_d = renderPlot({
+    input_models = unique(filtered_table()$model_name_short)
+    input_species = input$effect_species
+    input_trans = input$effect_trans
+    input_scale = input$effect_emp_scale
+    if(length(input_models) < 1 | length(input_species) < 1){
+      return()
+    }
+    plot_dt = abundance_effect_dt %>%
+              .[(model_name_short %in% input_models)] %>%
+              .[species_cd %in% input_species] %>%
+              setnames(.,c("variable_d","value"),c("variable","value_plot")) %>%
+              .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
+              na.omit(.) 
+    if(input_trans=="exp()")
+    {
+      plot_dt = plot_dt %>%
+                .[,value_link:=exp(value_plot)] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=value_link/max(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)]
+    } else if(input_trans=="Encounter probability"){
+      plot_dt = merge(plot_dt,index_summary_dt[,.(model_number,error_structure)],by="model_number") %>%
+                .[,error_1st:=substr(error_structure,1,2)] %>%
+                .[,value_link:=as.numeric(NA)] %>%
+                .[error_1st=="pl",value_link:=1-exp(-exp(value_plot))] %>%
+                .[error_1st=="lg",value_link:=boot::inv.logit(value_plot)] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=value_link/max(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
+                na.omit(.)
+    } else {
+      plot_dt = plot_dt %>%
+                .[,value_link:=value_plot] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=scales::rescale(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)]
+    }
+    if(nrow(plot_dt) == 0){
+      return()
+    }
+
+    if(input_scale){
+      plot_empirical_dt_internal = copy(plot_empirical_discrete_dt) %>%
+                          setnames(.,"empirical_sc_a","empirical_sc")
+    } else {
+      plot_empirical_dt_internal = copy(plot_empirical_discrete_dt) %>%
+                          setnames(.,"empirical_sc_b","empirical_sc")  
+    }
+
+    plot_dt$model_name_short = factor(plot_dt$model_name_short,levels=unique(plot_dt$model_name_short))
+    p = plot_empirical_dt_internal %>%
+    ggplot() +
+    ylab("Relative encounter rate") +
+	  xlab("Island group") +
+	  facet_wrap(category~species_cd,scales="free",ncol=7) +
+	  geom_bar(aes(x=breaks,y=empirical_sc,fill=gear_type),stat="identity",color="white",position=position_dodge()) +
+    geom_point(data=plot_dt,aes(x=variable,y=value_plot,color=model_name_short,group=model_name_short),position="jitter",size=2) +
+    geom_hline(yintercept=0) +
+    theme_few(base_size=20) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.ticks.y=element_blank(),axis.text.y=element_blank(),strip.text.x = element_text(size = 10)) +
+    scale_fill_manual("Gear type",values=c("gray60","gray80")) +
+	  viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+    
     return(p)
   },
   height=function(){
