@@ -48,11 +48,15 @@ library(ggthemes)
 	index_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/index_dt.csv")) %>%
             .[,category:=factor(category,levels=c("Total","'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 	index_summary_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/index_summary_dt.csv")) 
+	abundance_effect_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/abundance_effect_dt.csv")) %>%
+            .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+	plot_empirical_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_ab_dt.csv"))
+	plot_empirical_discrete_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_discrete_ab_dt.csv"))
 
 
 #_____________________________________________________________________________________________________________________________
 # app options
-  start_collapsed = TRUE
+  start_collapsed = FALSE
 
 #_____________________________________________________________________________________________________________________________
 # The app
@@ -74,7 +78,8 @@ ui = dashboardPage(
     sidebarMenu(id="sidebarmenu",
       menuItem("Introduction", tabName="introduction"),
       menuItem("Summary table", tabName="table"),
-      menuItem("Index plots", tabName="index_plots")
+      menuItem("Index plots", tabName="index_plots"),
+      menuItem("Effect plots", tabName="effect_plots")
     ),
 
     # Only show these on the plotting tabs - not Introduction and Summary table tabs
@@ -106,6 +111,33 @@ ui = dashboardPage(
       onStatus = "success", 
       offStatus = "danger")
     ),
+    conditionalPanel(condition="input.sidebarmenu == 'effect_plots'",
+      # species
+      awesomeCheckboxGroup(
+      inputId = "effect_species",
+      label = "Species", 
+        choices = levels(abundance_effect_dt[!is.na(species_cd)]$species_cd),
+      selected = levels(abundance_effect_dt[!is.na(species_cd)]$species_cd),
+      inline = FALSE, 
+        status = "danger"),
+      awesomeRadio(
+        inputId = "effect_trans",
+        label = "Effect transformation", 
+          choices = c("None", "exp()", "Encounter probability"),
+        selected = "Encounter probability",
+        inline = FALSE, 
+          status = "success"),
+      # scaled
+      switchInput(
+      inputId = "effect_emp_scale",  
+      label = "Scale empirical\nby gear",
+      value=FALSE,
+      onLabel = "TRUE",
+      offLabel = "FALSE",
+      onStatus = "success", 
+      offStatus = "danger")
+    ),
+
     br(),
     br(),
     tags$footer(
@@ -130,7 +162,7 @@ ui = dashboardPage(
       tabItem(tabName="table", h2("Summary table"),
         fluidRow(box(title="Model metrics", collapsed=start_collapsed, solidHeader=TRUE, collapsible=TRUE, status="primary", width=12,
          DT::dataTableOutput("summarytable")))
-      ), # End of summary table tab
+      ), # End of table tab
 
       # **** Index plots ****
       tabItem(tabName="index_plots", h2("Index plots"),
@@ -138,7 +170,16 @@ ui = dashboardPage(
           box(title="Standardized indices", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
             plotOutput("index_plots", height="auto"))
         )
-      ) # End of fittodata tab
+      ), # End of index_plots tab
+
+      # **** Effect plots ****
+      tabItem(tabName="effect_plots", h2("Effect plots"),
+        fluidRow(
+          box(title="Estimated abundance effects", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
+            p("Continuous covariates."),
+            plotOutput("ab_effect_plots_c", height="auto"))
+        )
+      ) # End of effect_plots tab
     ) # End of tabItems
   ) # End of dashboardBody
 )
@@ -191,7 +232,7 @@ server = function(input, output){
 
   filtered_table = reactive({
     req(input$summarytable_rows_selected)
-    keep_models = unique(c(0,ref_table_reduced[input$summarytable_rows_selected, ]$model_number))
+    keep_models = c(ref_table_reduced[input$summarytable_rows_selected, ]$model_number)
     return(as.data.frame(index_dt[model_number%in%keep_models],stringsAsFactors=FALSE))  
   })
 
@@ -204,7 +245,7 @@ server = function(input, output){
       return()
     }
     plot_dt = index_dt %>%
-              .[(model_name_short %in% c("00 design",input_models))] %>%
+              .[(model_name_short %in% unique(c("00 design",input_models)))] %>%
               .[category %in% input_species]
     if(nrow(plot_dt) == 0){
       return()
@@ -252,6 +293,84 @@ server = function(input, output){
       n_col = length(input$category)
     }
     return(max(height_per_panel*1.5, (height_per_panel * ceiling(length(input$category) / n_col))))
+  })
+  output$ab_effect_plots_c = renderPlot({
+    # Which models and fisheries
+    input_models = unique(filtered_table()$model_name_short)
+    input_species = input$effect_species
+    input_trans = input$effect_trans
+    input_scale = input$effect_emp_scale
+    if(length(input_models) < 1 | length(input_species) < 1){
+      return()
+    }
+    plot_dt = abundance_effect_dt %>%
+              .[(model_name_short %in% input_models)] %>%
+              .[species_cd %in% input_species] %>%
+              setnames(.,c("variable_c","value"),c("variable","value_plot")) %>%
+              .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
+              na.omit(.) 
+    if(input_trans=="exp()")
+    {
+      plot_dt = plot_dt %>%
+                .[,value_link:=exp(value_plot)] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=value_link/max(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)]
+    } else if(input_trans=="Encounter probability"){
+      plot_dt = merge(plot_dt,index_summary_dt[,.(model_number,error_structure)],by="model_number") %>%
+                .[,error_1st:=substr(error_structure,1,2)] %>%
+                .[,value_link:=as.numeric(NA)] %>%
+                .[error_1st=="pl",value_link:=1-exp(-exp(value_plot))] %>%
+                .[error_1st=="lg",value_link:=boot::inv.logit(value_plot)] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=value_link/max(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
+                na.omit(.)
+    } else {
+      plot_dt = plot_dt %>%
+                .[,value_link:=value_plot] %>%
+                .[,value_plot:=NULL] %>%
+							  .[,value_link_rescale:=scales::rescale(value_link),by=.(model_number,species_cd,category)] %>%
+                setnames(.,c("value_link_rescale"),c("value_plot")) %>%
+                .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)]
+    }
+    if(nrow(plot_dt) == 0){
+      return()
+    }
+
+    if(input_scale){
+      plot_empirical_dt_internal = copy(plot_empirical_dt) %>%
+                          setnames(.,"empirical_sc_a","empirical_sc")
+    } else {
+      plot_empirical_dt_internal = copy(plot_empirical_dt) %>%
+                          setnames(.,"empirical_sc_b","empirical_sc")  
+    }
+
+    plot_dt$model_name_short = factor(plot_dt$model_name_short,levels=unique(plot_dt$model_name_short))
+    p = plot_empirical_dt_internal %>%
+    .[gear_type=="camera"] %>%
+    .[category %in% unique(plot_dt$category)&species_cd %in%input_species] %>%
+    ggplot() +
+    ylim(0,NA) +
+    ylab("Relative encounter rate") +
+	  xlab("Habitat covariate") +
+	  facet_wrap(category~species_cd,scales="free",ncol=length(input_species)) +
+	  geom_rect(aes(xmin=breaks-x_width,xmax=breaks,ymin=0,ymax=empirical_sc,fill=gear_type),color="white") +
+ 	  geom_rect(data=plot_empirical_dt_internal[gear_type=="research_fishing" & category %in% unique(plot_dt$category)&species_cd %in%input_species],aes(xmin=breaks,xmax=breaks+x_width,ymin=0,ymax=empirical_sc,fill=gear_type),color="white") +
+    geom_line(data=plot_dt,aes(x=variable,y=value_plot,color=model_name_short,group=model_name_short)) +
+    geom_hline(yintercept=0) +
+    theme_few(base_size=20) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.ticks.y=element_blank(),axis.text.y=element_blank(),strip.text.x = element_text(size = 10)) +
+    scale_fill_manual("Gear type",values=c("gray60","gray80")) +
+	  viridis::scale_color_viridis("Model",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
+   
+    return(p)
+  },
+  height=function(){
+      n_col = length(input$effect_species)
+    return(max(height_per_panel*2.25, (height_per_panel * ceiling(length(input$effect_species) / n_col))))
   })
 
 } # End of server
