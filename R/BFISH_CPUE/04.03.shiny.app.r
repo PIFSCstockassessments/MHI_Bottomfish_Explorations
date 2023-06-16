@@ -57,7 +57,8 @@ library(ggthemes)
 	abundance_effect_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/abundance_effect_dt.csv")) %>%
             .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 	plot_empirical_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_ab_dt.csv"))
-	plot_empirical_discrete_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_discrete_ab_dt.csv"))
+	plot_empirical_discrete_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_discrete_ab_dt.csv")) %>%
+                                  .[,breaks:=factor(breaks,levels=c("Niihau","Kauai","Oahu","Maui Nui", "Big Island"))]
 
 
 #_____________________________________________________________________________________________________________________________
@@ -182,6 +183,7 @@ ui = dashboardPage(
       tabItem(tabName="index_plots", h2("Index plots"),
         fluidRow(
           box(title="Standardized indices", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
+            p("Select at least one model."),
             plotOutput("index_plots", height="auto"))
         )
       ), # End of index_plots tab
@@ -194,7 +196,7 @@ ui = dashboardPage(
             plotOutput("ab_effect_plots_c", height="auto"))
         ),
         fluidRow(
-          box(title="Estimated abundance effects: discrete covariates", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
+          box(title="Estimated abundance effects: discrete covariates", solidHeader=TRUE, collapsible=TRUE, collapsed=TRUE, status="primary", width=12,
             p("Select at least one model with defined discrete abundance covariates."),
             plotOutput("ab_effect_plots_d", height="auto"))
         )
@@ -407,7 +409,8 @@ server = function(input, output){
               .[species_cd %in% input_species] %>%
               setnames(.,c("variable_d","value"),c("variable","value_plot")) %>%
               .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
-              na.omit(.) 
+              na.omit(.) %>%
+              .[variable!=""]
     if(input_trans=="exp()")
     {
       plot_dt = plot_dt %>%
@@ -449,10 +452,11 @@ server = function(input, output){
 
     plot_dt$model_name_short = factor(plot_dt$model_name_short,levels=unique(plot_dt$model_name_short))
     p = plot_empirical_dt_internal %>%
+    .[category %in% unique(plot_dt$category)&species_cd %in%input_species] %>%
     ggplot() +
     ylab("Relative encounter rate") +
 	  xlab("Island group") +
-	  facet_wrap(category~species_cd,scales="free",ncol=7) +
+	  facet_wrap(category~species_cd,scales="free",ncol=length(input_species)) +
 	  geom_bar(aes(x=breaks,y=empirical_sc,fill=gear_type),stat="identity",color="white",position=position_dodge()) +
     geom_point(data=plot_dt,aes(x=variable,y=value_plot,color=model_name_short,group=model_name_short),position="jitter",size=2) +
     geom_hline(yintercept=0) +
