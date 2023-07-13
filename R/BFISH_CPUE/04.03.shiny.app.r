@@ -42,10 +42,11 @@ library(ggthemes)
   date_modified = as.POSIXct(strsplit(as.character(date_modified),"\\s+")[[1]][1])
   today = Sys.time()
   today = as.POSIXct(strsplit(as.character(today),"\\s+")[[1]][1])
+  update = FALSE
 
-  if(date_modified!=today)
+  if(date_modified!=today & update)
   {
-    source(paste0(code_dir,"R/BFISH_CPUE/04.04.gather.indices.shiny.r"))
+    source(paste0(code_dir,"R/BFISH_CPUE/04.02.gather.indices.shiny.r"))
     rm(list=setdiff(ls(),c("code_dir","proj_dir")))
   }
 
@@ -56,7 +57,11 @@ library(ggthemes)
 	index_summary_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/index_summary_dt.csv")) 
 	abundance_effect_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/abundance_effect_dt.csv")) %>%
             .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
-	plot_empirical_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_ab_dt.csv"))
+	q_effect_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/q_effect_dt.csv")) %>%
+            .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+		
+  
+  plot_empirical_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_ab_dt.csv"))
 	plot_empirical_discrete_dt = fread(file=paste0(proj_dir,"VAST/model_runs/comparison_plots/plot_empirical_discrete_ab_dt.csv")) %>%
                                   .[,breaks:=factor(breaks,levels=c("Niihau","Kauai","Oahu","Maui Nui", "Big Island"))]
 
@@ -86,7 +91,7 @@ ui = dashboardPage(
       menuItem("Introduction", tabName="introduction"),
       menuItem("Summary table", tabName="table"),
       menuItem("Index plots", tabName="index_plots"),
-      menuItem("Effect plots", tabName="effect_plots")
+      menuItem("Effect plots: abundance", tabName="effect_plots_a")
     ),
 
     # Only show these on the plotting tabs - not Introduction and Summary table tabs
@@ -126,7 +131,7 @@ ui = dashboardPage(
         force_edges = TRUE,
       grid = TRUE)
     ),
-    conditionalPanel(condition="input.sidebarmenu == 'effect_plots'",
+    conditionalPanel(condition="input.sidebarmenu == 'effect_plots_a'",
       # species
       awesomeCheckboxGroup(
       inputId = "effect_species",
@@ -189,7 +194,7 @@ ui = dashboardPage(
       ), # End of index_plots tab
 
       # **** Effect plots ****
-      tabItem(tabName="effect_plots", h2("Effect plots"),
+      tabItem(tabName="effect_plots_a", h2("Effect plots: abundance"),
         fluidRow(
           box(title="Estimated abundance effects: continuous covariates", solidHeader=TRUE, collapsible=TRUE, collapsed=start_collapsed, status="primary", width=12,
             p("Select at least one model with defined continuous abundance covariates."),
