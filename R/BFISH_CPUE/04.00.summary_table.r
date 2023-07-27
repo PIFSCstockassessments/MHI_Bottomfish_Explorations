@@ -85,6 +85,8 @@
 								.[,ab_config := strsplit(name,"_")[[1]][6]] %>%
 								.[,lehi_filter := strsplit(name,"_")[[1]][7]] %>%
 								.[,fine_scale := strsplit(name,"_")[[1]][9]] %>%
+								.[,all_lengths:="FALSE"] %>%
+								.[,gears_used:="both"] %>%
 								.[,date:=as.POSIXct(date)] %>%
 								.[,runtime:=parameter_estimates$time_for_run] %>%
 								.[,nll:=parameter_estimates$objective] %>%
@@ -99,13 +101,18 @@
 								.[,bad_param:=problem_par] %>%
 								cbind(.,t(t(table(parameter_estimates$diagnostics$Param)))) %>%
 								.[,V2:=NULL] %>%
-								setnames(.,"V1","parameter") 
+								setnames(.,"V1","parameter")
+		if(length(strsplit(tmp_name,"_")[[1]])>=14)
+		{
+			summary_dt.list[[i]]$all_lengths = strsplit(tmp_name,"_")[[1]][13]
+			summary_dt.list[[i]]$gears_used = strsplit(tmp_name,"_")[[1]][14]
+		} 
 		
 		rm(list=c("parameter_estimates","tmp_date","tmp_name","tmp_complete","problem_par"))
 	}
 
 	summary_dt = rbindlist(summary_dt.list) %>%
-				 dcast(.,date+name+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+complete+bad_param~parameter)
+				 dcast(.,date+name+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+fine_scale+all_lengths+gears_used+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+complete+bad_param~parameter)
 
 	fwrite(summary_dt,file=paste0(proj.dir,"VAST/model_runs/comparison_plots/summary_dt.",as.character(format(Sys.time(),format="%Y-%m-%d")),".csv"))
 

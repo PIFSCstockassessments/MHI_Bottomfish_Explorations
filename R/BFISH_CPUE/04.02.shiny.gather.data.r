@@ -358,6 +358,8 @@
 				.[,lehi_filter := FALSE] %>%
 				.[,knot_dist:=NA] %>%
 				.[,fine_scale := NA] %>%
+				.[,all_lengths:="FALSE"] %>%
+				.[,gears_used := "both"] %>%
                 .[,estimate:=estimate*2.20462262185] %>%
 				.[,estimate:=estimate/1000000] %>%
 				.[,l95:=exp(log(estimate)-2*sqrt(log(cv^2+1)))] %>%
@@ -368,7 +370,7 @@
 			    .[,estimate_sc:=estimate/mean(estimate),by=.(category)] %>%
 			    .[,l95_sc:=exp(log(estimate_sc)-2*sqrt(log(cv^2+1)))] %>%
 			    .[,u95_sc:=exp(log(estimate_sc)+2*sqrt(log(cv^2+1)))] %>%
-				.[,.(name,date,data_year,error_structure,species,data_treatment,q_config,ab_config,lehi_filter,knot_dist,fine_scale,model_name_short,category,time,estimate,cv,l95,u95,estimate_sc,l95_sc,u95_sc)]
+				.[,.(name,date,data_year,error_structure,species,data_treatment,q_config,ab_config,lehi_filter,knot_dist,fine_scale,all_lengths,gears_used,model_name_short,category,time,estimate,cv,l95,u95,estimate_sc,l95_sc,u95_sc)]
 
 
 #_____________________________________________________________________________________________________________________________
@@ -398,6 +400,8 @@
 						.[,lehi_filter := strsplit(name,"_")[[1]][7]] %>%
 						.[,knot_dist := as.numeric(strsplit(name,"_")[[1]][8])] %>%
 						.[,fine_scale := strsplit(name,"_")[[1]][9]] %>%
+						.[,all_lengths:="FALSE"] %>%
+						.[,gears_used := "both"] %>%
 						.[,date:=as.POSIXct(date)] %>%
 						 setnames(.,c("Model","Category","Time","Estimate","CV"),c("model_name_short","category","time","estimate","cv")) %>%
                      .[,model_name_short:=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name)] %>%
@@ -407,8 +411,13 @@
 					 .[,estimate_sc:=estimate/mean(estimate),by=.(category)] %>%
 			         .[,l95_sc:=exp(log(estimate_sc)-2*sqrt(log(cv^2+1)))] %>%
 			         .[,u95_sc:=exp(log(estimate_sc)+2*sqrt(log(cv^2+1)))] %>%
-					 .[,.(name,date,data_year,error_structure,species,data_treatment,q_config,ab_config,lehi_filter,knot_dist,fine_scale,model_name_short,category,time,estimate,cv,l95,u95,estimate_sc,l95_sc,u95_sc)]
-	
+					 .[,.(name,date,data_year,error_structure,species,data_treatment,q_config,ab_config,lehi_filter,knot_dist,fine_scale,all_lengths,gears_used,model_name_short,category,time,estimate,cv,l95,u95,estimate_sc,l95_sc,u95_sc)]
+		
+		if(length(strsplit(tmp_name,"_")[[1]])>=14)
+		{
+			index_dt.list[[i]]$all_lengths = strsplit(tmp_name,"_")[[1]][13]
+			index_dt.list[[i]]$gears_used = strsplit(tmp_name,"_")[[1]][14]
+		} 
 		parameter_estimates = read_vast_parameter_estimates(readLines(paste0(proj_dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/setup/parameter_estimates.txt")))
 		parameter_estimates_final = read_vast_parameter_estimates(readLines(paste0(proj_dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/parameter_estimates.txt")))
 		var_par = grep("\\bL_",parameter_estimates_final$diagnostics$Param)
@@ -427,6 +436,8 @@
 								.[,lehi_filter := strsplit(name,"_")[[1]][7]] %>%
 								.[,knot_dist := as.numeric(strsplit(name,"_")[[1]][8])] %>%
 								.[,fine_scale := strsplit(name,"_")[[1]][9]] %>%
+								.[,all_lengths:="FALSE"] %>%
+								.[,gears_used := "both"] %>%
 								.[,date:=as.POSIXct(date)] %>%
 								.[,runtime:=parameter_estimates$time_for_run] %>%
 								.[,nll:=parameter_estimates$objective] %>%
@@ -441,13 +452,23 @@
 								cbind(.,t(t(table(parameter_estimates$diagnostics$Param)))) %>%
 								.[,V2:=NULL] %>%
 								setnames(.,"V1","parameter")
+		if(length(strsplit(tmp_name,"_")[[1]])>=14)
+		{
+			index_summary_dt.list[[i]]$all_lengths = strsplit(tmp_name,"_")[[1]][13]
+			index_summary_dt.list[[i]]$gears_used = strsplit(tmp_name,"_")[[1]][14]
+		} 
 		if(tmp_model[6]!="v"|tmp_model[5]!="v")
 		{
 			load(paste0(proj_dir,"VAST/model_runs/",tmp_date,"/",tmp_name,"/fit.RData"))
 		}						
 		if(tmp_model[6]!="v")
 		{
-			abundance_effect_dt.list[[i]] = extract_abundance_effects(fit_internal=fit,model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name))
+			if(strsplit(tmp_name,"_")[[1]][3]=="mv")
+			{
+				abundance_effect_dt.list[[i]] = extract_abundance_effects(fit_internal=fit,model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name))
+			} else {
+				abundance_effect_dt.list[[i]] = extract_abundance_effects(fit_internal=fit,model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name),target_species=strsplit(tmp_name,"_")[[1]][3])
+			}
 			
 		} else {
 			abundance_effect_dt.list[[i]] = data.table(model_name=paste0(ifelse(i<10,"0",""),i," ",tmp_model_name),
@@ -485,11 +506,11 @@
 			.[order(model_number,time,category)]
 
   index_summary_dt = rbindlist(index_summary_dt.list) %>%
-				 dcast(.,date+name+model_name_short+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+knot_dist+fine_scale+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+bad_param~parameter) %>%
+				 dcast(.,date+name+model_name_short+data_year+error_structure+species+data_treatment+q_config+ab_config+lehi_filter+knot_dist+fine_scale+all_lengths+gears_used+runtime+nll+n_par+n_fixed+n_random+aic+aic_all+mgc+bad_param~parameter) %>%
 					merge(.,data.table(model_name_short="00 design",q_config="design",ab_config="design"),by=c("model_name_short","q_config","ab_config"),all=TRUE) %>%
   					.[,model_number:=as.numeric(sapply(model_name_short,function(x)strsplit(x,"\\s+")[[1]][1]))] %>%
 					.[order(model_number)] %>%
-					.[,.(model_number,model_name_short,q_config,ab_config,data_year,error_structure,species,data_treatment,lehi_filter,knot_dist,fine_scale,runtime,nll,n_par,n_fixed,n_random,aic,aic_all,mgc,bad_param,L_epsilon1_z,L_epsilon2_z,L_eta1_z,L_eta2_z,L_omega1_z,L_omega2_z,beta1_ft,beta2_ft,gamma1_cp,lambda1_k,lambda2_k,logSigmaM,logkappa1,logkappa2)]
+					.[,.(model_number,model_name_short,q_config,ab_config,data_year,error_structure,species,data_treatment,lehi_filter,knot_dist,fine_scale,all_lengths,gears_used,runtime,nll,n_par,n_fixed,n_random,aic,aic_all,mgc,bad_param,L_epsilon1_z,L_epsilon2_z,L_eta1_z,L_eta2_z,L_omega1_z,L_omega2_z,beta1_ft,beta2_ft,gamma1_cp,lambda1_k,lambda2_k,logSigmaM,logkappa1,logkappa2)]
 
   abundance_effect_dt = rbindlist(abundance_effect_dt.list) %>%
 					setnames(.,"model_name","model_name_short") %>%

@@ -80,6 +80,7 @@
     } else{
         target_species = species
     }
+    target_species_all = c("prfi","etca","etco","prsi","przo","hyqu","apru")
 	bfish_df = bfish_combined_long_dt %>% .[species_cd %in% target_species] %>% as.data.frame(.)
 	
 	# remove sample with large lehi observation
@@ -384,10 +385,6 @@
 			which(abs(fit_setup$ParHat$L_epsilon2_z)<1e-3|abs(fit_setup$ParHat$L_epsilon2_z)>1.5e1)
 			
 			settings$FieldConfig["Epsilon","Component_2"] = 0
-			modified_map = fit_setup$tmb_list$Map
-			modified_parameters = fit_setup$tmb_list$Obj$env$parList()
-
-		
 
 		fit = fit_model( settings=settings,
  				   				Lon_i=bfish_df$lon,
@@ -412,42 +409,10 @@
           						# spatial list args
     	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
     	  						spatial_list = spatial_list,
-								Map = modified_map,
-    	  						Parameters = modified_parameters,
     	  						test_fit=TRUE); gc()
 		fit$parameter_estimates
 
-		# re-fit model using Map and Parameters from fit in order to get aggregate index
-		dir.create(paste0(working_dir,"agg/"),recursive=TRUE)
-		fit_agg = fit_model( settings=settings,
- 				   				Lon_i=bfish_df$lon,
-    			   				Lat_i=bfish_df$lat,
-          						t_i=as.integer(bfish_df$year),
-          						b_i=bfish_df$weight_kg,
-          						a_i=rep(pi * (0.02760333457^2),nrow(bfish_df)), # assumed area swept from the MOUSS camera converted to km2; Ault et al 2018
-	    	  					c_i = as.numeric(factor(bfish_df[,'species_cd'],levels=c(target_species)))-1,
-	    	  					v_i = as.numeric(factor(bfish_df[,'platform']))-1,
-								category_names=c(target_species),
-	    	  					Expansion_cz = cbind( c(0,3,3,3,3,3,3), c(0,0,1,2,3,4,5)),
-	    	  					covariate_data = ab_df,
-								X1_formula = ab1_formula,
-								X2_formula = ab2_formula,
-	    	  					catchability_data = q_data,
-                                Q1_formula = q1_formula,
-                                Q2_formula = q2_formula,
-          						working_dir = paste0(working_dir,"agg/"),
-          						newtonsteps = 1,
-          						# extrapolation list args
-          						projargs=slot(crs_eqd,"projargs"),input_grid=input_grid,
-          						extrapolation_list = Extrapolation_List,
-          						# spatial list args
-    	  						Method = "Barrier",anisotropic_mesh = mesh_inla,grid_size_LL = 0.5/110,Save_Results = FALSE,LON_intensity=intensity_loc[,1],LAT_intensity=intensity_loc[,2],
-    	  						spatial_list = spatial_list,
-								Map = fit$tmb_list$Map,
-    	  						Parameters = fit$ParHat,
-                                test_fit=FALSE); gc()
-			fit_agg$parameter_estimates$time_for_run
-		
+	
 		# bias correction
 			if(bias_correct)
 			{
@@ -456,37 +421,24 @@
 					ADREPORT_name = "Index_ctl",
 					eps_name = "eps_Index_ctl",
 					inner.control = list(sparse=TRUE, lowrank=TRUE, trace=FALSE) )
-				# agg
-				Sdreport_agg = apply_epsilon( fit_agg,
-					ADREPORT_name = "Index_ctl",
-					eps_name = "eps_Index_ctl",
-					inner.control = list(sparse=TRUE, lowrank=TRUE, trace=FALSE) )
 				B = proc.time()
 				B-A	
 			} else {
 				Sdreport = fit$parameter_estimates$SD
-				# agg
-				Sdreport_agg = fit_agg$parameter_estimates$SD
 			}
 
 
 		# save outputs
 			index = plot_biomass_index( fit,DirName=working_dir)
-			index_agg = plot_biomass_index( fit_agg,DirName=paste0(working_dir,"agg/"))
 
 			save(fit,file=paste0(working_dir,"fit.RData"))
 			save(Sdreport,file=paste0(working_dir,"Sdreport.RData"))
-			save(fit_agg,file=paste0(working_dir,"fit_agg.RData"))
-			save(Sdreport_agg,file=paste0(working_dir,"Sdreport_agg.RData"))
 
 			bfish_df$pred_weight_kg = fit$Report$D_i
 			bfish_dt = as.data.table(bfish_df)		
 			save(bfish_dt,file=paste0(working_dir,"bfish_dt.RData"))
 
 		# calculate RMSE
-			rmse_agg_dt = copy(bfish_dt) %>%
-				  .[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)),nrmse=sqrt(mean((weight_kg-pred_weight_kg)^2))/sd(weight_kg),.N)] %>%
-				  .[,type:="agg"]
 			rmse_spec_dt = copy(bfish_dt) %>%
 					.[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)),nrmse=sqrt(mean((weight_kg-pred_weight_kg)^2))/sd(weight_kg),.N),by=species_cd] %>%
 					setnames(.,"species_cd","type")
@@ -502,7 +454,7 @@
 			rmse_strata_dt = copy(bfish_dt) %>%
 					.[,.(rmse=sqrt(mean((weight_kg-pred_weight_kg)^2)),nrmse=sqrt(mean((weight_kg-pred_weight_kg)^2))/sd(weight_kg),.N),by=strata] %>%
 					setnames(.,"strata","type")				  
-			rmse_dt = rbind(rmse_agg_dt,rmse_spec_dt,rmse_year_dt,rmse_island_dt,rmse_gear_dt,rmse_strata_dt)
+			rmse_dt = rbind(rmse_spec_dt,rmse_year_dt,rmse_island_dt,rmse_gear_dt,rmse_strata_dt)
 			fwrite(rmse_dt,file=paste0(working_dir,"rmse_dt.csv"))
 			gc()
 
@@ -512,33 +464,13 @@
 			mv_dt = as.data.table(index$Table)
 			mv_dt$Estimate = Sdreport$unbiased$value[names(Sdreport$unbiased$value)=="Index_ctl"]
 			mv_dt = mv_dt%>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=target_species)] %>%
+                .[,Category:=target_species[as.numeric(gsub("Category_","",Category))]] %>%
+				.[,Category:=factor(Category,levels=target_species_all)] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2022)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%
 				setnames(.,"Std. Error for Estimate","SD") %>%
 				.[,.(Model,Category,Time,Estimate,SD)] %>%
-				.[,CV:=SD/Estimate] %>%
-				.[,SD:=NULL] %>%
-				.[,Estimate:=Estimate*2.20462262185] %>%
-				.[,Estimate:=Estimate/1000000] %>%
-				.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
-				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
-
-			mv_agg_dt = as.data.table(index_agg$Table)
-			mv_agg_dt$Estimate = Sdreport_agg$unbiased$value[names(Sdreport_agg$unbiased$value)=="Index_ctl"]
-			mv_agg_dt = as.data.table(index_agg$Table) %>%
-				.[Category=="Category_7"] %>%
-				.[,Category:="agg"] %>%
-				.[Stratum=="Stratum_1"] %>%
-				.[,Time:=(2016:2022)[as.numeric(factor(Time))]] %>%
-				.[,Model:="mv"] %>%
-				setnames(.,"Std. Error for Estimate","SD") %>%
-				.[,.(Model,Category,Time,SD)] %>%
-				merge(., mv_dt[,.(Estimate=sum(Estimate)),by=Time],by="Time") %>%
-				.[,.(Model,Category,Time,Estimate,SD)] %>%
-				.[,Estimate:=Estimate/2.20462262185] %>%
-				.[,Estimate:=Estimate*1000000] %>%
 				.[,CV:=SD/Estimate] %>%
 				.[,SD:=NULL] %>%
 				.[,Estimate:=Estimate*2.20462262185] %>%
@@ -548,22 +480,8 @@
 			
 		} else {
 			mv_dt = as.data.table(index$Table) %>%
-				.[,Category:=factor(Category,levels=paste0("Category_",1:7),labels=target_species)] %>%
-				.[Stratum=="Stratum_1"] %>%
-				.[,Time:=(2016:2022)[as.numeric(factor(Time))]] %>%
-				.[,Model:="mv"] %>%
-				setnames(.,"Std. Error for Estimate","SD") %>%
-				.[,.(Model,Category,Time,Estimate,SD)] %>%
-				.[,CV:=SD/Estimate] %>%
-				.[,SD:=NULL] %>%
-				.[,Estimate:=Estimate*2.20462262185] %>%
-				.[,Estimate:=Estimate/1000000] %>%
-				.[,l95:=exp(log(Estimate)-2*sqrt(log(CV^2+1)))] %>%
-				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
-
-			mv_agg_dt = as.data.table(index_agg$Table) %>%
-				.[Category=="Category_7"] %>%
-				.[,Category:="agg"] %>%
+				.[,Category:=target_species[as.numeric(gsub("Category_","",Category))]] %>%
+				.[,Category:=factor(Category,levels=target_species_all)] %>%
 				.[Stratum=="Stratum_1"] %>%
 				.[,Time:=(2016:2022)[as.numeric(factor(Time))]] %>%
 				.[,Model:="mv"] %>%
@@ -577,5 +495,35 @@
 				.[,u95:=exp(log(Estimate)+2*sqrt(log(CV^2+1)))]
 			}
 
-		index_dt = rbind(mv_dt,mv_agg_dt)
+		index_dt = rbind(mv_dt)
 		fwrite(index_dt,file=paste0(working_dir,"index_dt.csv"))	
+
+	# calc residuals
+    # about 12 minutes
+	n_sim = 250
+    rs = 123
+	sim_fit = matrix(NA,nrow=length(fit$data_list$b_i),ncol=n_sim)
+	for(j in 1:n_sim)
+	{
+		# ~20 seconds
+		sim_dat = simulate_data( fit,type = 1,random_seed = list(rs+j,NULL)[[1+is.null(rs)]])
+		sim_fit[,j] = sim_dat$b_i
+		rm(list="sim_dat")
+	}
+
+    residuals_dharma = summary(fit,what="residuals",type=1,n_samples=n_sim,random_seed=rs)
+	dev.off()
+	residuals_dharma$simulatedResponse = sim_fit
+	residuals_dharma$observedResponse = as.vector(fit$data_list$b_i)
+
+	residuals_dharma2 = DHARMa::createDHARMa(simulatedResponse=sim_fit,
+				observedResponse=as.vector(fit$data_list$b_i),
+				fittedPredictedResponse=as.vector(fit$Report$D_i),
+				integer=FALSE)
+	
+
+	# save
+	save(sim_fit,file=paste0(working_dir,"sim_fit.RData"))
+	save(residuals_dharma,file=paste0(working_dir,"residuals_dharma.RData"))
+	save(residuals_dharma2,file=paste0(working_dir,"residuals_dharma2.RData"))
+
