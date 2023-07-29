@@ -28,7 +28,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2022_" # includes data through 2022
+	# data_flag = "2022_" # includes data through 2022
 #_____________________________________________________________________________________________________________________________
 # define helper function for
 	convert_date_time = function(input_date,input_time,tz_input="UTC",tz_output="HST")
@@ -173,6 +173,8 @@
 						  .[,SEASON:=ifelse(as.numeric(MONTH)>6,"Fall","Spring")] %>%
 						  .[,design_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)] %>%
 						  .[,model_sampling_unit:=DROP_CD]
+	fwrite(unique(camera_dt[,.(DROP_CD)]),file=paste0(proj.dir,"Data/",data_flag,"01.camera_dt.drop_cd.csv"))
+
 
 	# save formatted data
 		save(BFISH_CAM_S,file=paste0(proj.dir,"Data/",data_flag,"01.BFISH_CAM_S.RData"))

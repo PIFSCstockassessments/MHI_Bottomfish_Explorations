@@ -22,7 +22,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2022_" # includes data through 2022
+	# data_flag = "2022_" # includes data through 2022
 
 #_____________________________________________________________________________________________________________________________
 # bring in camera data
@@ -65,6 +65,7 @@
                          .[(DROP_CD %in% dark_drops) | (DROP_CD %in% missing_lengths)]
 
     camera_dt = camera_dt %>% .[!(model_sampling_unit %in% bad_sampling_units$model_sampling_unit)]
+	fwrite(unique(camera_dt[,.(DROP_CD)]),file=paste0(proj.dir,"Data/",data_flag,"03.camera_dt.drop_cd.csv"))
 
     	                    
 

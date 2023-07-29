@@ -25,10 +25,10 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2022_" # includes data through 2022
+	# data_flag = "2022_" # includes data through 2022
 #_____________________________________________________________________________________________________________________________
 # bring research fishing data
-	load(file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.all_lengths.RData"))
+	load(file=paste0(proj.dir,"Data/",data_flag,"research_fishing_dt.RData"))
 
 #_____________________________________________________________________________________________________________________________
 # format research_fishing_dt to have common columns
@@ -56,7 +56,7 @@
 					   # select proper columns
 					   .[,.(model_sampling_unit, design_sampling_unit,psu, island, strata, strata_2020, substrate, slope, depth_strata, depth_strata_2020, complexity, hardness,date, year, season, month, jd, year_continuous,lon, lat,depth, time, lunar_phase,gear_type, platform, obs_wind, obs_wave, obs_current, etco, etca, prsi, prfi, przo, hyqu, apru)]
 	# save
-	save(common_research_fishing_dt,file=paste0(proj.dir,"Data/",data_flag,"common_research_fishing_dt.all_lengths.RData"))
+	save(common_research_fishing_dt,file=paste0(proj.dir,"Data/",data_flag,"common_research_fishing_dt.RData"))
 
 
 #_____________________________________________________________________________________________________________________________
@@ -66,7 +66,7 @@
 	for(i in 1:5)
 	{
 		# load data
-		load(file=paste0(proj.dir,"Data/",data_flag,"0",i,".camera_dt.all_lengths.RData"))
+		load(file=paste0(proj.dir,"Data/",data_flag,"0",i,".camera_dt.RData"))
 		# format camera_dt to have common columns
 		common_camera_dt = camera_dt %>% 
 						.[,gear_type:="camera"] %>%
@@ -109,9 +109,9 @@
 								setnames(.,c("variable","value"),c("species_cd","weight_kg"))
 		
 		# save formatted data
-		save(common_camera_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".common_camera_dt.all_lengths.RData"))
-		save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_wide_dt.all_lengths.RData"))
-		save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_long_dt.all_lengths.RData"))
+		save(common_camera_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".common_camera_dt.RData"))
+		save(bfish_combined_wide_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_wide_dt.RData"))
+		save(bfish_combined_long_dt,file=paste0(proj.dir,"Data/",data_flag,"0",i,".bfish_combined_long_dt.RData"))
 
 		# clean-up
 		rm(list=c("camera_dt","common_camera_dt","bfish_combined_wide_dt","bfish_combined_long_dt"))

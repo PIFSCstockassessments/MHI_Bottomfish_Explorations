@@ -22,7 +22,7 @@
 #_____________________________________________________________________________________________________________________________
 # define data_flag
 	# data_flag = "" # only loads data up through 2020
-	data_flag = "2022_" # includes data through 2022
+	# data_flag = "2022_" # includes data through 2022
 
 #_____________________________________________________________________________________________________________________________
 # bring in camera data
@@ -61,6 +61,7 @@
 						  .[,SEASON:=ifelse(as.numeric(MONTH)>6,"Fall","Spring")] %>%
 						  .[,design_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)] %>%
 						  .[,model_sampling_unit:=paste0(YEAR,"_",SEASON,"_",PSU)]
+	fwrite(unique(camera_dt[,.(DROP_CD)]),file=paste0(proj.dir,"Data/",data_flag,"04.camera_dt.drop_cd.csv"))
 
     # combine secondary sampling units (DROP_CD) within each primary sampling unit (model_sampling_unit)
     mode = function(x)
