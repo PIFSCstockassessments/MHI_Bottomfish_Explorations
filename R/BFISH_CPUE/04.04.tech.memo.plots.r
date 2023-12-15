@@ -276,16 +276,18 @@ p = merge(p,index_summary_dt[,.(model_number,error_structure)],by="model_number"
 							  .[,value_link_rescale:=value_link/max(value_link),by=.(model_number,species_cd,category)] %>%
                 setnames(.,c("value_link_rescale"),c("value_plot")) %>%
                 .[,.(model_number,model_name_short,component,species_cd,category,variable,value_plot)] %>%
-                na.omit(.)
- plot_empirical_dt_internal = copy(plot_empirical_dt) %>%
-                          setnames(.,"empirical_sc_b","empirical_sc")
+                na.omit(.) %>%
+                .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
+
+plot_empirical_dt_internal = copy(plot_empirical_dt) %>%
+                          setnames(.,"empirical_sc_b","empirical_sc") %>%
+                          .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))]
 
 
     p$model_name_short = factor(p$model_name_short,levels=unique(p$model_name_short),labels=c("09: Final model (lgdl)"))
     p = plot_empirical_dt_internal %>%
     .[gear_type=="camera"] %>%
-    .[category %in% unique(p$category)] %>%
-    .[,species_cd:=factor(species_cd,levels=c("'Opakapaka (PRFI)","Ehu (ETCA)","Onaga (ETCO)","Kalekale (PRSI)","Gindai (PRZO)","Hapu'upu'u (HYQU)","Lehi (APRU)"))] %>%
+    .[category %in% unique(p$category)]  %>%
     ggplot() +
     ylim(0,NA) +
     ylab("Relative encounter rate") +
@@ -770,7 +772,7 @@ p = merge(p,index_summary_dt[,.(model_number,error_structure)],by="model_number"
       .[model_number %in% c(46,51,49)] %>%
       .[category == "Total" ] %>%
       .[,model_name_plot := factor(as.character(model_number),levels=as.character(c(46,51,49)),labels=c("01: Base (Step 07)","01: Comp. 1","01: Comp. 1&2"))] %>%
-      .[,panel:="Panel 01: Vessel RE"]
+      .[,panel:="Panel 01: Platform RE"]
   p2= index_dt %>% 
       .[model_number %in% c(57,69,62,66)] %>%
       .[category == "Total" ] %>%
