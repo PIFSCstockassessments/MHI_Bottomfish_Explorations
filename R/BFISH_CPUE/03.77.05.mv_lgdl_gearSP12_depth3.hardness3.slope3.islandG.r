@@ -52,9 +52,11 @@
     
 #_____________________________________________________________________________________________________________________________
 # set working directory
-	proj.dir = "D:/HOME/SAP/2024_Deep7/"
-	working_dir = paste0(proj.dir,"VAST/model_runs/",as.character(format(Sys.time(),format="%Y-%m-%d")),"/",model_name,"/")
-	dir.create(working_dir,recursive=TRUE)
+	proj.dir = "C:/Users/Nicholas.Ducharme-Ba/Temp_Storage/HOME/SAP/2024_Deep7/"
+  	plot_dir = paste0(proj.dir,"Reports/tech_memo_v3/")
+	# 	working_dir = paste0(proj.dir,"VAST/model_runs/",as.character(format(Sys.time(),format="%Y-%m-%d")),"/",model_name,"/")
+	working_dir = paste0(proj.dir,"VAST/model_runs/2023-06-14/",model_name,"/")
+	# dir.create(working_dir,recursive=TRUE)
 
     load_spatial_path = paste0(proj.dir,"VAST/model_runs/2023-06-02/2022_pldg_mv_05_v_v_TRUE_7.5_TRUE_TRUE_pit_noxval/")
 	# xval path
@@ -250,7 +252,7 @@
  			boundary_col = "hotpink"
  			land_col = "gray90"
 	 		
-	 		png(filename = paste0(working_dir,"spatial_mesh.png"),width = 16, height = 9, units = "in",res=300)
+	 		png(filename = paste0(plot_dir,"spatial_mesh.png"),width = 16, height = 9, units = "in",res=300, bg=NA)
 	 		par(mar=c(5,5,1,1))
 			sp::plot(hi_coast_eqd,axes=TRUE,col=land_col,ylim=c(-300,300),xlab="Eastings (km)",ylab="Northings (km)",cex=1.5,cex.axis=1.5,cex.lab=1.5,las=1)
 			lines(x,y,col=barrier_col)
@@ -289,10 +291,10 @@
 			geom_abline(slope=3,intercept=meanvar_lm$coefficients[1],linetype="dashed",color="gray70") +
 			geom_abline(slope=meanvar_lm$coefficients[2],intercept=meanvar_lm$coefficients[1],linetype="dashed",color="black",linewidth=2) +			
 			geom_point(aes(x=mean,y=var,fill=species_cd,size=N),shape=21) +
-			theme_few(base_size=20) +
+			theme_few(base_size=20) + theme(rect = element_rect(fill="transparent"), strip.background=element_rect(fill="transparent"),panel.background=element_rect(fill="transparent"),plot.background=element_rect(fill="transparent",color=NA),legend.key = element_rect(color = "transparent", fill = "transparent")) +
 			geom_text(data=text_dt,aes(x=x,y=y,label=label),size=7) +
      		viridis::scale_fill_viridis("Species\ncode",begin = 0.1,end = 0.8,direction = 1,option = "H",discrete=TRUE)
-			ggsave(filename=paste0("mean_var.png"), plot = p, device = "png", path = working_dir,
+			ggsave(filename=paste0("mean_var.png"), plot = p, device = "png", bg = "transparent", path = plot_dir,
 	  			scale = 1.25, width = 9, height = 9, units = c("in"),
 	  			dpi = 300, limitsize = TRUE)
 
